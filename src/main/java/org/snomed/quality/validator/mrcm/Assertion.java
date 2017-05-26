@@ -1,21 +1,20 @@
 package org.snomed.quality.validator.mrcm;
 
-import org.snomed.quality.validator.mrcm.model.Attribute;
-import org.snomed.quality.validator.mrcm.model.Domain;
-
 import java.util.List;
+import java.util.UUID;
+
+import org.snomed.quality.validator.mrcm.model.Attribute;
 
 public class Assertion {
-
-	private final Domain domain;
+	private final UUID uuid;
 	private final Attribute attribute;
-	private final String domainAttributeRangeConstraint;
 	private final List<Long> conceptIdsWithInvalidAttributeValue;
+	private final String assertionText;
 
-	public Assertion(Domain domain, Attribute attribute, String domainAttributeRangeConstraint, List<Long> conceptIdsWithInvalidAttributeValue) {
-		this.domain = domain;
+	public Assertion(Attribute attribute, String assertionText, List<Long> conceptIdsWithInvalidAttributeValue) {
 		this.attribute = attribute;
-		this.domainAttributeRangeConstraint = domainAttributeRangeConstraint;
+		this.uuid = attribute.getUuid();
+		this.assertionText = assertionText;
 		this.conceptIdsWithInvalidAttributeValue = conceptIdsWithInvalidAttributeValue;
 	}
 
@@ -25,11 +24,22 @@ public class Assertion {
 
 	@Override
 	public String toString() {
-		return "Assertion{" +
-				"domain=" + domain +
-				", attribute=" + attribute +
-				", domainAttributeRangeConstraint='" + domainAttributeRangeConstraint + '\'' +
-				", conceptIdsWithInvalidAttributeValue=" + conceptIdsWithInvalidAttributeValue +
-				'}';
+		return "Assertion [uuid=" + uuid + ", attribute=" + attribute + ", conceptIdsWithInvalidAttributeValue=" + conceptIdsWithInvalidAttributeValue + "]";
+	}
+
+	public UUID getUuid() {
+		return uuid;
+	}
+
+	public Attribute getAttribute() {
+		return attribute;
+	}
+
+	public List<Long> getConceptIdsWithInvalidAttributeValue() {
+		return conceptIdsWithInvalidAttributeValue;
+	}
+
+	public String getAssertionText() {
+		return assertionText;
 	}
 }

@@ -1,19 +1,21 @@
 package org.snomed.quality.validator.mrcm.model;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class Domain {
 
 	private String domainId;
 	private String domainConstraint;
-	private final List<Attribute> attributes;
+	private final Set<Attribute> attributes;
+	private final Map<String,Set<Attribute>> attributeRanges;
 
 	public Domain(String domainId) {
 		this.domainId = domainId;
-		attributes = new ArrayList<>();
+		attributes = new HashSet<>();
+		attributeRanges = new HashMap<>();
 	}
 
 	public void setDomainConstraint(String domainConstraint) {
@@ -32,14 +34,30 @@ public class Domain {
 		attributes.add(attribute);
 	}
 
-	public List<Attribute> getAttributes() {
+	public Set<Attribute> getAttributes() {
 		return attributes;
+	}
+	
+	public Set<Attribute> getAttributeRanges(String attributeId) {
+		if (!attributeRanges.containsKey(attributeId)) {
+			return new HashSet<>();
+		} else {
+			return attributeRanges.get(attributeId);
+		}
+	}
+	
+	public void addAttributeRange(Attribute attributeRange) {
+		if (attributeRanges.containsKey(attributeRange.getAttributeId())) {
+			attributeRanges.get(attributeRange.getAttributeId()).add(attributeRange);
+		} else {
+			Set<Attribute> ranges = new HashSet<>();
+			ranges.add(attributeRange);
+			attributeRanges.put(attributeRange.getAttributeId(), ranges);
+		}
 	}
 
 	@Override
 	public String toString() {
-		return "Domain{" +
-				"domainConstraint='" + domainConstraint + '\'' +
-				'}';
+		return "Domain [domainId=" + domainId + ", domainConstraint=" + domainConstraint + "]";
 	}
 }
