@@ -224,9 +224,6 @@ public class ValidationService {
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
-			if (referencedComponentId.startsWith("<< 272125009")) {
-				System.out.println(referencedComponentId);
-			}
 			synchronized (this) {
 				if ("1".equals(active)) {
 					switch (refsetId) {

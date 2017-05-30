@@ -2,20 +2,20 @@ package org.snomed.quality.validator.mrcm;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Domain;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.Set;
 
 public class Application {
 
 	private static final String NEW_LINE = "\n";
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(Application.class);
 
 	public static void main(String[] args) throws ReleaseImportException, IOException, ServiceException {
 		String releasePackage = null;
@@ -54,13 +54,13 @@ public class Application {
 		reportSummary.append("Total assertions skipped:" + run.getSkippedAssertions().size());
 		reportSummary.append(NEW_LINE);
 		reportSummary.append("Total assertions failed:" + run.getFailedAssertions().size());
-		System.out.println(reportSummary.toString());
+		LOGGER.info("Report summary: {}", reportSummary.toString());
 		for (Assertion skipped : run.getSkippedAssertions()) {
-			System.out.println("Assertion skipped:" + skipped.getAttribute() + " Reason: " + skipped.getAssertionText());
+			LOGGER.info("Assertion skipped: {}, Reason: {}", skipped.getAttribute(), skipped.getAssertionText());
 		}
 		Set<Assertion> failedAssertions = run.getFailedAssertions();
 		for (Assertion failedAssertion : failedAssertions) {
-			System.out.println("Assertion failed: " + failedAssertion);
+			LOGGER.info("Assertion failed:: {}", failedAssertion);
 		}
 	}
 }
