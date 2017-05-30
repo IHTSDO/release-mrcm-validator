@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.snomed.quality</groupId>
-    <artifactId>mrcm-validator</artifactId>
+    <artifactId>release-mrcm-validator</artifactId>
     <version>1.0.1-SNAPSHOT</version>
 
     <properties>
