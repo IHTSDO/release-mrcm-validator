@@ -6,12 +6,12 @@ import org.ihtsdo.otf.snomedboot.factory.ImpotentComponentFactory;
 import org.ihtsdo.otf.snomedboot.factory.LoadingProfile;
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
-import org.ihtsdo.otf.sqs.service.dto.ConceptResults;
+import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
 import org.ihtsdo.otf.sqs.service.store.ReleaseStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.snomed.quality.validator.mrcm.ValidationRun.ValidationType;
+import org.snomed.quality.validator.mrcm.ValidationType;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Attribute.Type;
 import org.snomed.quality.validator.mrcm.model.Domain;
@@ -19,6 +19,7 @@ import org.springframework.util.Assert;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +29,9 @@ import java.util.Set;
 import java.util.UUID;
 
 public class ValidationService {
+	private static final String RULE_STRENGTH_IS_NOT_MANDATORY = "Rule strength is not mandatory";
+	private static final String CONTENT_TYPE_IS_OUT_OF_SCOPE = "Content type is out of scope:";
+	private static final String NO_CARDINALITY_CONSTRAINT = "0..*";
 	public static final String MANDATORY = "723597001";
 	public static final String MRCM_DOMAIN_REFSET = "723560006";
 	public static final String MRCM_ATTRIBUTE_DOMAIN_REFSET = "723561005";
@@ -51,10 +55,11 @@ public class ValidationService {
 		run.setMRCMDomains(domains);
 	}
 
-	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
-		//.withStatedRelationships().withStatedAttributeMapOnConcept().withInferredAttributeMapOnConcept());
-		ReleaseStore releaseStore = new ReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, LoadingProfile.light);
-
+	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException, ParseException {
+		LoadingProfile profile = run.isStatedView() ? 
+				LoadingProfile.light.withFullRelationshipObjects().withStatedRelationships()
+				.withStatedAttributeMapOnConcept().withoutAllRefsets().withoutInferredAttributeMapOnConcept() : LoadingProfile.light.withFullRelationshipObjects().withoutAllRefsets();
+		ReleaseStore releaseStore = new ReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
 		//checking data is loaded properly
 		LOGGER.info("Total concepts loaded:" + queryService.getConceptCount());
@@ -69,9 +74,117 @@ public class ValidationService {
 			case ATTRIBUTE_RANGE :
 				executeAttributeRangeValidation(run, queryService, precoordinatedTypes);
 				break;
-			default :
-				LOGGER.error("ValidationType is not implemented yet!" + type);
+			case ATTRIBUTE_CARDINALITY :
+				executeAttributeCardinalityValidation(run, queryService, precoordinatedTypes);
 				break;
+			case ATTRIBUTE_GROUP_CARDINALITY :
+				executeAttributeGroupCardinalityValidation(run, queryService, precoordinatedTypes);
+				break;
+			default :
+				LOGGER.error("ValidationType:" + type + " is not implemented yet!");
+				break;
+			}
+		}
+	}
+
+	private void executeAttributeGroupCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
+		for (Domain domain : run.getMRCMDomains().values()) {
+			for (Attribute attribute : domain.getAttributes()) {
+				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
+					//skip
+					run.addSkippedAssertion(attribute, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId());
+					continue;
+				}
+				String domainPartEcl = "<<" + domain.getDomainId() + ":"; 
+				//				String domainPartEcl = "*" + ":"; 
+				String attributePartEcl = "<<" + attribute.getAttributeId() + "=*";
+				if (MANDATORY.equals(attribute.getRuleStrengthId()) && attribute.isGrouped() && !NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeIngroupCardinality())) {
+					String eclWithoutCardinality = domainPartEcl + "[0..*]" + " { [0..*] " + attributePartEcl + " }";
+					//run ECL query to retrieve failures
+					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without group cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
+					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
+					String eclWithCardinality = domainPartEcl + "[" + attribute.getAttributeCardinality() + "]" + "{ [" + attribute.getAttributeIngroupCardinality() + "] " + attributePartEcl + "}";
+					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
+					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
+					List<Long> invalidIds = new ArrayList<>();
+					if (conceptIdsWithoutCardinality.size() != conceptIdsWithCardinality.size()) {
+						invalidIds = conceptIdsWithoutCardinality;
+						invalidIds.removeAll(conceptIdsWithCardinality);
+					}
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY);
+				} else {
+					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_GROUP_CARDINALITY.getName() + " Skipped reason: ";
+					if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
+						skipMsg += RULE_STRENGTH_IS_NOT_MANDATORY;
+					} else if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeIngroupCardinality())) {
+						skipMsg += " Attribute group cardinality constraint is " + attribute.getAttributeIngroupCardinality();
+					} else if (!attribute.isGrouped()) {
+						skipMsg += " Attribute constraint is not grouped.";
+					}
+					run.addSkippedAssertion(attribute,ValidationType.ATTRIBUTE_GROUP_CARDINALITY, skipMsg);
+				}
+			}
+		}
+
+	}
+
+	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
+			List<Long> invalidIds, ValidationType type) throws ServiceException {
+		String msg = "";
+		if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId()) && run.getReleaseDate() != null) {
+			List<Long> currentRelease = new ArrayList<>();
+			for (Long conceptId : invalidIds) {
+				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
+				if (run.getReleaseDate().equals(result.getEffectiveTime())) {
+					currentRelease.add(conceptId);
+				} 
+			}
+			if (invalidIds.size() > currentRelease.size()) {
+				msg += " Total failures=" + invalidIds.size() + " and failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
+			}
+			run.addCompletedAssertion(attribute, type, msg, currentRelease);
+		} else {
+			run.addCompletedAssertion(attribute, type, msg, invalidIds);
+		}
+	}
+
+	private void executeAttributeCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
+		
+		for (Domain domain : run.getMRCMDomains().values()) {
+			for (Attribute attribute : domain.getAttributes()) {
+				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
+					//skip
+					run.addSkippedAssertion(attribute, ValidationType.ATTRIBUTE_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId());
+					continue;
+				}
+				String domainPartEcl = domain.getDomainId() + ":"; 
+				String attributePartEcl = "<<" + attribute.getAttributeId() + "=*";
+				if (MANDATORY.equals(attribute.getRuleStrengthId()) && !NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
+					String eclWithoutCardinality = domainPartEcl +  attributePartEcl;
+					//run ECL query to retrieve failures
+					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
+					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
+					
+					String eclWithCardinality = domainPartEcl + " [" + attribute.getAttributeCardinality() + "] " + attributePartEcl;
+					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
+					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
+					List<Long> invalidIds = new ArrayList<>();
+					if (conceptIdsWithoutCardinality.size() != conceptIdsWithCardinality.size()) {
+						invalidIds = conceptIdsWithoutCardinality;
+						invalidIds.removeAll(conceptIdsWithCardinality);
+					}
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY);
+				} else {
+					String skipMsg = "";
+					if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
+						skipMsg += RULE_STRENGTH_IS_NOT_MANDATORY;
+					} else {
+						if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
+							skipMsg += "Attribute cardinality constraint is " + attribute.getAttributeCardinality();
+						}
+					}
+					run.addSkippedAssertion(attribute, ValidationType.ATTRIBUTE_CARDINALITY, skipMsg);
+				}
 			}
 		}
 	}
@@ -113,7 +226,7 @@ public class ValidationService {
 						attributeDomainMap.put(attribute.getAttributeId(), domainList);
 					}
 				} else {
-					run.addSkippedAssertion(attribute, ValidationType.ATTRIBUTE_DOMAIN.getName() + " is skipped due to either the rule strengh is not mandatory:" 
+					run.addSkippedAssertion(attribute, ValidationType.ATTRIBUTE_DOMAIN, " is skipped due to either the rule strengh is not mandatory:" 
 							+ attribute.getRuleStrengthId() + " or the content type is out of scope:" + attribute.getContentTypeId() );
 				}
 			}
@@ -142,7 +255,7 @@ public class ValidationService {
 			//run ECL query to retrieve failures
 			LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
 			List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
-			run.addCompletedAssertion(attributeIdMap.get(attributeId), ValidationType.ATTRIBUTE_DOMAIN.getName() + ":" + domains.toString() , conceptIdsWithInvalidAttributeValue);
+			processValidationResults(run, queryService, attributeIdMap.get(attributeId), conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_DOMAIN);
 		}
 	}
 
@@ -178,10 +291,9 @@ public class ValidationService {
 									: baseEcl + rangeConstraint;
 
 					if (matchAttributeValuesWithinRange.contains("[")) {
-						// TODO: Implement cardinality within the snomed-query-service project.
 						String msg = "Cardinality is not currently supported. This assertion will be skipped." + "ECL:" + matchAttributeValuesWithinRange;
 						LOGGER.warn(msg);
-						run.addSkippedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE.getName() + ":" + attributeRange.getRangeConstraint() + " " + msg);
+						run.addSkippedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, msg);
 						continue;
 					}
 
@@ -198,9 +310,9 @@ public class ValidationService {
 						conceptIdsWithInvalidAttributeValue.addAll(conceptsWithAnyAttributeValue);
 						conceptIdsWithInvalidAttributeValue.removeAll(conceptsWithAttributeValueWithinRange);
 					} 
-					run.addCompletedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE.getName() + ":" + attributeRange.getRangeConstraint(), conceptIdsWithInvalidAttributeValue);
+					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE);
 				} else {
-					run.addSkippedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE.getName() + " skipped due to content type:" + attributeRange.getContentTypeId() + " is out of scope.");
+					run.addSkippedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope.");
 				}
 			}
 		}
@@ -279,14 +391,6 @@ public class ValidationService {
 				domains.put(referencedComponentId, new Domain(referencedComponentId));
 			}
 			return domains.get(referencedComponentId);
-		}
-		
-		
-		public List<Attribute> getAttribute(String attributeId) {
-			if (!attributes.containsKey(attributeId)) {
-				throw new IllegalStateException("No attribute domain found for attributeId:" + attributeId);
-			}
-			return attributes.get(attributeId);
 		}
 		
 		public Attribute createAttributeDomain(String id,String attributeId, String ... otherValues) {
