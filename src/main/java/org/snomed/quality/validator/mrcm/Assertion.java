@@ -51,7 +51,7 @@ public class Assertion {
 	@Override
 	public String toString() {
 		String base = "Assertion [uuid=" + uuid + ", attribute=" + attribute + ",validationType=" + validationType + ",violatedConceptIds=" + violatedConceptIds;
-		if (message != null) {
+		if (message != null && !message.isEmpty()) {
 			return base + " message=" + message + "]";
 		} else {
 			return base + "]";
