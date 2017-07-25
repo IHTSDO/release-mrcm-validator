@@ -25,28 +25,27 @@ public class Application {
 	private static final Logger LOGGER = LoggerFactory.getLogger(Application.class);
 	
 	public static void main(String[] args) throws Exception {
-		
-		System.out.println("Java argument 1 is for the release package unzipped full file path. (required):" + " eg:/Users/mchu/Releases/international/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
-		System.out.println("Java argument 2 is to state whether to use stated relationships. (optional default to true):" + "e.g false (implies to use inferred instead.)");
-		System.out.println("Java argument 3 is the release date for current new content(optional):" + " e.g 20170731.(Note: Don't specify this argument when testing for all failures.)");
 		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
 		String releasePackage = null;
 		String releaseDate = null;
 		boolean isStatedViewOnly = true;
-		if ( args!= null && args.length > 0) {
+		if ( args == null || args.length < 2) {
+			System.out.println("Usage: Replace the {} with actual values." + "{releasePackageFullPathName} {true of false} {20170731}");
+			System.out.println("Java argument 1 is for the release package unzipped full file path. (required):" + " eg:/Users/mchu/Releases/international/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
+			System.out.println("Java argument 2 is to state whether to use stated relationships. (optional default to true):" + "e.g false (implies to use inferred instead.)");
+			System.out.println("Java argument 3 is the release date for current new content(optional):" + " e.g 20170731.(Note: Don't specify this argument when testing for all failures.)");
+		} else {
 			releasePackage = args[0];
-			if (args.length == 2) {
-				isStatedViewOnly =  Boolean.getBoolean(args[1]);
-			} else if (args.length == 3) {
-				isStatedViewOnly = Boolean.getBoolean(args[1]);
+			isStatedViewOnly =  Boolean.parseBoolean(args[1]);
+			if (args.length == 3) {
 				releaseDate = args[2];
+				if (releaseDate != null) {
+					dateFormat.parse(releaseDate);
+				}
 			} else {
-				System.out.println("Usage: Replace the {} with actual values." + "{releasePackageFullPathName} {true of false} {20170731}");
+				System.out.println("No release date is specified therefore all failures will be reported.");
 			}
-			if (releaseDate != null) {
-				dateFormat.parse(releaseDate);
-			}
-		} 
+		}
 		new Application().run(releasePackage, releaseDate, isStatedViewOnly);
 	}
 
