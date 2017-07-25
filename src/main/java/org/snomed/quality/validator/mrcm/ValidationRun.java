@@ -13,27 +13,19 @@ import java.util.stream.Collectors;
 
 public class ValidationRun {
 	
-	public enum ValidationType {
-		ATTRIBUTE_DOMAIN("Attribute domain"),
-		ATTRIBUTE_RANGE("Attribute domain range");
-		private String name;
-		private ValidationType(String name) {
-			this.name=name;
-		}
-		String getName() {
-			return this.name;
-		}
-		
-	}
 	private List<ValidationType> validationTypes;
 	private Map<String, Domain> MRCMDomains;
-	private Set<Assertion> assertionsCompleted;
-	private Set<Assertion> assertionSkipped;
+	private List<Assertion> assertionsCompleted;
+	private List<Assertion> assertionSkipped;
+	private String releaseDate = null;
+	private boolean isStatedView = false;
 
-	public ValidationRun() {
-		assertionsCompleted = new HashSet<>();
+	public ValidationRun(String releaseDate, boolean isStatedView) {
+		assertionsCompleted = new ArrayList<>();
 		validationTypes = Arrays.asList(ValidationType.values());
-		assertionSkipped = new HashSet<>();
+		assertionSkipped = new ArrayList<>();
+		this.releaseDate = releaseDate;
+		this.isStatedView = isStatedView;
 	}
 	
 	public List<ValidationType> getValidationTypes() {
@@ -52,21 +44,30 @@ public class ValidationRun {
 		return MRCMDomains;
 	}
 
-	public void addSkippedAssertion(Attribute attribute,String assertionText) {
-		assertionSkipped.add(new Assertion(attribute, assertionText, new ArrayList<Long>()));
+	public void addSkippedAssertion(Attribute attribute, ValidationType type, String msg) {
+		assertionSkipped.add(new Assertion(attribute, type, "Skipped reason:" + msg));
 	}
-	public void addCompletedAssertion(Attribute attribute,String assertionText,List<Long> conceptIdsWithInvalidAttributeValue) {
-		assertionsCompleted.add(new Assertion(attribute, assertionText, conceptIdsWithInvalidAttributeValue));
+	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, List<Long> violatedConceptIds) {
+		assertionsCompleted.add(new Assertion(attribute, type, message, violatedConceptIds));
 	}
 
 	public Set<Assertion> getFailedAssertions() {
 		return assertionsCompleted.stream().filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
-	public Set<Assertion> getCompletedAssertions() {
+	public List<Assertion> getCompletedAssertions() {
 		return assertionsCompleted;
 	}
 
-	public Set<Assertion> getSkippedAssertions() {
+	public List<Assertion> getSkippedAssertions() {
 		return assertionSkipped;
 	}
+
+	public String getReleaseDate() {
+		return releaseDate;
+	}
+
+	public boolean isStatedView() {
+		return isStatedView;
+	}
+	
 }
