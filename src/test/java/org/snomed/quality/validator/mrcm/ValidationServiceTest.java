@@ -105,10 +105,10 @@ public class ValidationServiceTest {
 			System.out.println(assertion);
 			assertEquals("272741003", assertion.getAttribute().getAttributeId());
 			assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
-			assertEquals(4,assertion.getViolatedConceptIds().size());
+			assertEquals(4,assertion.getCurrentViolatedConceptIds().size());
 			List<Long> expected = Arrays.asList(Long.valueOf("159530000"),Long.valueOf("160959002"),Long.valueOf("161054003"), Long.valueOf("102563003"));
-			assertEquals(expected.size(),assertion.getViolatedConceptIds().size());
-			assertTrue(expected.containsAll(assertion.getViolatedConceptIds()));
+			assertEquals(expected.size(),assertion.getCurrentViolatedConceptIds().size());
+			assertTrue(expected.containsAll(assertion.getCurrentViolatedConceptIds()));
 		}
 	}
 	
@@ -125,7 +125,7 @@ public class ValidationServiceTest {
 			System.out.println(assertion);
 			assertEquals("363698007", assertion.getAttribute().getAttributeId());
 			assertEquals("<< 442083009 |Anatomical or acquired body structure (body structure)|", assertion.getAttribute().getRangeConstraint());
-			assertTrue(assertion.getViolatedConceptIds().contains(new Long("29857009")));
+			assertTrue(assertion.getCurrentViolatedConceptIds().contains(new Long("29857009")));
 			
 		}
 	}
@@ -142,9 +142,9 @@ public class ValidationServiceTest {
 			System.out.println(assertion);
 			assertEquals("272741003", assertion.getAttribute().getAttributeId());
 			assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
-			assertEquals(1,assertion.getViolatedConceptIds().size());
+			assertEquals(1,assertion.getCurrentViolatedConceptIds().size());
 			List<Long> expected = Arrays.asList(Long.valueOf("91723000"));
-			assertEquals(expected,assertion.getViolatedConceptIds());
+			assertEquals(expected,assertion.getCurrentViolatedConceptIds());
 		}
 	}
 	
@@ -162,9 +162,9 @@ public class ValidationServiceTest {
 			System.out.println(assertion);
 			assertEquals("363698007", assertion.getAttribute().getAttributeId());
 			assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
-			assertEquals(1,assertion.getViolatedConceptIds().size());
+			assertEquals(1,assertion.getCurrentViolatedConceptIds().size());
 			List<Long> expected = Arrays.asList(Long.valueOf("404684003"));
-			assertEquals(expected,assertion.getViolatedConceptIds());
+			assertEquals(expected,assertion.getCurrentViolatedConceptIds());
 		}
 	}
 	
