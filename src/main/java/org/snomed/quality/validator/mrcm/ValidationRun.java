@@ -47,8 +47,13 @@ public class ValidationRun {
 	public void addSkippedAssertion(Attribute attribute, ValidationType type, String msg) {
 		assertionSkipped.add(new Assertion(attribute, type, "Skipped reason:" + msg));
 	}
-	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, List<Long> violatedConceptIds) {
-		assertionsCompleted.add(new Assertion(attribute, type, message, violatedConceptIds));
+	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, 
+			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds) {
+		assertionsCompleted.add(new Assertion(attribute, type, message, currentViolatedConceptIds, previousViolatedConceptIds));
+	}
+	
+	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, List<Long> currentViolatedConceptIds) {
+		assertionsCompleted.add(new Assertion(attribute, type, message, currentViolatedConceptIds));
 	}
 
 	public Set<Assertion> getFailedAssertions() {

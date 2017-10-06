@@ -9,29 +9,41 @@ import org.snomed.quality.validator.mrcm.model.Attribute;
 public class Assertion {
 	private final UUID uuid;
 	private final Attribute attribute;
-	private final List<Long> violatedConceptIds;
+	private List<Long> currentViolatedConceptIds;
+	private List<Long> previousViolatedConceptIds;
 	private final String message;
 	private ValidationType validationType;
-
 	
 	public Assertion(Attribute attribute, ValidationType type, String msg) {
 		this.attribute = attribute;
 		this.uuid = attribute.getUuid();
 		this.message = msg;
-		this.violatedConceptIds = new ArrayList<>();
+		this.currentViolatedConceptIds = new ArrayList<>();
+		this.previousViolatedConceptIds = new ArrayList<>();
 		this.validationType = type;
 	}
 	
-	public Assertion(Attribute attribute, ValidationType type, String msg, List<Long> violatedConceptIds) {
-		this.attribute = attribute;
-		this.uuid = attribute.getUuid();
-		this.message = msg;
-		this.validationType = type;
-		this.violatedConceptIds = violatedConceptIds;
+	public Assertion(Attribute attribute, ValidationType type, String msg, List<Long> currentViolatedConceptIds) {
+		this(attribute, type, msg);
+		this.currentViolatedConceptIds = currentViolatedConceptIds;
+	}
+	
+	public Assertion(Attribute attribute, ValidationType type, String msg, 
+			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds) {
+		this(attribute, type, msg, currentViolatedConceptIds);
+		this.previousViolatedConceptIds = previousViolatedConceptIds;
+	}
+	
+	public List<Long> getPreviousViolatedConceptIds() {
+		return previousViolatedConceptIds;
+	}
+
+	public void setPreviousViolatedConceptIds(List<Long> previousViolatedConceptIds) {
+		this.previousViolatedConceptIds = previousViolatedConceptIds;
 	}
 
 	public boolean invalidConceptsFound() {
-		return !violatedConceptIds.isEmpty();
+		return (!currentViolatedConceptIds.isEmpty() || !previousViolatedConceptIds.isEmpty());
 	}
 	
 	
@@ -50,7 +62,7 @@ public class Assertion {
 
 	@Override
 	public String toString() {
-		String base = "Assertion [uuid=" + uuid + ", attribute=" + attribute + ",validationType=" + validationType + ",violatedConceptIds=" + violatedConceptIds;
+		String base = "Assertion [uuid=" + uuid + ", attribute=" + attribute + ",validationType=" + validationType;
 		if (message != null && !message.isEmpty()) {
 			return base + " message=" + message + "]";
 		} else {
@@ -66,8 +78,8 @@ public class Assertion {
 		return attribute;
 	}
 
-	public List<Long> getViolatedConceptIds() {
-		return violatedConceptIds;
+	public List<Long> getCurrentViolatedConceptIds() {
+		return currentViolatedConceptIds;
 	}
 
 	public String getMessage() {
@@ -82,7 +94,7 @@ public class Assertion {
 		result = prime * result + ((message == null) ? 0 : message.hashCode());
 		result = prime * result + ((uuid == null) ? 0 : uuid.hashCode());
 		result = prime * result + ((validationType == null) ? 0 : validationType.hashCode());
-		result = prime * result + ((violatedConceptIds == null) ? 0 : violatedConceptIds.hashCode());
+		result = prime * result + ((currentViolatedConceptIds == null) ? 0 : currentViolatedConceptIds.hashCode());
 		return result;
 	}
 
@@ -112,10 +124,10 @@ public class Assertion {
 			return false;
 		if (validationType != other.validationType)
 			return false;
-		if (violatedConceptIds == null) {
-			if (other.violatedConceptIds != null)
+		if (currentViolatedConceptIds == null) {
+			if (other.currentViolatedConceptIds != null)
 				return false;
-		} else if (!violatedConceptIds.equals(other.violatedConceptIds))
+		} else if (!currentViolatedConceptIds.equals(other.currentViolatedConceptIds))
 			return false;
 		return true;
 	}

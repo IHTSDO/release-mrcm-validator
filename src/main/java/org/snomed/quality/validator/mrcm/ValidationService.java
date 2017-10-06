@@ -131,7 +131,9 @@ public class ValidationService {
 	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
 			List<Long> invalidIds, ValidationType type) throws ServiceException {
 		String msg = "";
-		if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId()) && run.getReleaseDate() != null) {
+		
+		if (run.getReleaseDate() != null) {
+			//Filter out failures for current release and previous published release.
 			List<Long> currentRelease = new ArrayList<>();
 			for (Long conceptId : invalidIds) {
 				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
@@ -142,8 +144,17 @@ public class ValidationService {
 			if (invalidIds.size() > currentRelease.size()) {
 				msg += " Total failures=" + invalidIds.size() + " and failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
 			}
-			run.addCompletedAssertion(attribute, type, msg, currentRelease);
+			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
+				run.addCompletedAssertion(attribute, type, msg, currentRelease);
+			} else {
+				invalidIds.removeAll(currentRelease);
+				run.addCompletedAssertion(attribute, type, msg, currentRelease, invalidIds);
+			}
 		} else {
+			// for ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT display message that no effect date is supplied
+			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
+				msg += " Content type is for new concept only but there is no current release date specified.";
+			} 
 			run.addCompletedAssertion(attribute, type, msg, invalidIds);
 		}
 	}
