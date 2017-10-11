@@ -71,14 +71,13 @@ public class ValidationServiceTest {
 	public void testValidReleaseForSpecificAttribute() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 //		String attributeId ="363698007";
+//		String attributeId = "408729009";
 		String attributeId = "272741003";
 		Map<String, Domain> domainsToValidate = new HashMap<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
-			Domain selectedDomain = new Domain(domain.getDomainId());
 			for (Attribute attribute : domain.getAttributes()) {
 				if (attribute.getAttributeId().equals(attributeId)) {
-					selectedDomain.addAttribute(attribute);
-					domainsToValidate.put(selectedDomain.getDomainId(), selectedDomain);
+					domainsToValidate.put(domain.getDomainId(), domain);
 				}
 			}
 		}
