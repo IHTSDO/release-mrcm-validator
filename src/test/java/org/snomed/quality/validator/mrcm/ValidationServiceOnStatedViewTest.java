@@ -28,7 +28,6 @@ public class ValidationServiceOnStatedViewTest {
 		validationService = new ValidationService();
 		run = new ValidationRun("20170731",true);
 		releaseTestFile = Paths.get("src/test/resources/rf2TestFiles").toFile();
-//		releaseTestFile = Paths.get("release").toFile();
 		validationService.loadMRCM(releaseTestFile,run);
 	}
 	

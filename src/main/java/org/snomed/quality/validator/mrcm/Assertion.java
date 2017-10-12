@@ -13,6 +13,7 @@ public class Assertion {
 	private List<Long> previousViolatedConceptIds;
 	private final String message;
 	private ValidationType validationType;
+	private String domainConstraint;
 	
 	public Assertion(Attribute attribute, ValidationType type, String msg) {
 		this.attribute = attribute;
@@ -25,13 +26,16 @@ public class Assertion {
 	
 	public Assertion(Attribute attribute, ValidationType type, String msg, List<Long> currentViolatedConceptIds) {
 		this(attribute, type, msg);
-		this.currentViolatedConceptIds = currentViolatedConceptIds;
+		this.currentViolatedConceptIds = currentViolatedConceptIds == null ?  
+				new ArrayList<>() : currentViolatedConceptIds;
+		
 	}
 	
 	public Assertion(Attribute attribute, ValidationType type, String msg, 
-			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds) {
+			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds, String domainConstraint) {
 		this(attribute, type, msg, currentViolatedConceptIds);
-		this.previousViolatedConceptIds = previousViolatedConceptIds;
+		this.previousViolatedConceptIds = previousViolatedConceptIds == null ? new ArrayList<>() : previousViolatedConceptIds;
+		this.domainConstraint = domainConstraint;
 	}
 	
 	public List<Long> getPreviousViolatedConceptIds() {
@@ -43,19 +47,21 @@ public class Assertion {
 	}
 
 	public boolean invalidConceptsFound() {
-		return (!currentViolatedConceptIds.isEmpty() || !previousViolatedConceptIds.isEmpty());
+		return (currentViolatedConceptIds != null && !currentViolatedConceptIds.isEmpty()) 
+				|| (previousViolatedConceptIds != null && !previousViolatedConceptIds.isEmpty());
 	}
 	
-	
 	public String getAssertionText() {
-		String assertionText = "MRCM rule must be applied to attribute:" 
-				+ attribute.getAttributeId() +  " within content type:" + attribute.getContentTypeId() + " with constraint:" + validationType.getName();
+		String assertionText = String.format("MRCM rule must be applied to attribute:%s for content type:%s within %s constraint:", 
+				attribute.getAttributeId(), attribute.getContentTypeId(), validationType.getName().toLowerCase());
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeIngroupCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			assertionText += " " + attribute.getRangeConstraint();
+		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType && domainConstraint != null) {
+			assertionText += " " + this.domainConstraint;
 		}
 		return assertionText;
 	}

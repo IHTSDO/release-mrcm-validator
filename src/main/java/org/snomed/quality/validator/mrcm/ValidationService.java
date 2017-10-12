@@ -111,7 +111,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, null);
 				} else {
 					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_GROUP_CARDINALITY.getName() + " Skipped reason: ";
 					if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
@@ -129,9 +129,8 @@ public class ValidationService {
 	}
 
 	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
-			List<Long> invalidIds, ValidationType type) throws ServiceException {
+			List<Long> invalidIds, ValidationType type, String domainConstraint) throws ServiceException {
 		String msg = "";
-		
 		if (run.getReleaseDate() != null) {
 			//Filter out failures for current release and previous published release.
 			List<Long> currentRelease = new ArrayList<>();
@@ -145,17 +144,17 @@ public class ValidationService {
 				msg += " Total failures=" + invalidIds.size() + " and failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
 			}
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
-				run.addCompletedAssertion(attribute, type, msg, currentRelease);
+				run.addCompletedAssertion(attribute, type, msg, currentRelease, null, domainConstraint);
 			} else {
 				invalidIds.removeAll(currentRelease);
-				run.addCompletedAssertion(attribute, type, msg, currentRelease, invalidIds);
+				run.addCompletedAssertion(attribute, type, msg, currentRelease, invalidIds, domainConstraint);
 			}
 		} else {
 			// for ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT display message that no effect date is supplied
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				msg += " Content type is for new concept only but there is no current release date specified.";
 			} 
-			run.addCompletedAssertion(attribute, type, msg, invalidIds);
+			run.addCompletedAssertion(attribute, type, msg, invalidIds, null, domainConstraint);
 		}
 	}
 
@@ -184,7 +183,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY, null);
 				} else {
 					String skipMsg = "";
 					if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
@@ -205,7 +204,6 @@ public class ValidationService {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes,validationCompleted);
 		}
-		
 	}
 
 	/**
@@ -223,17 +221,17 @@ public class ValidationService {
 	 * 
 	*/
 	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
-		Map<String,List<String>> attributeDomainMap = new HashMap<>();
+		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, Attribute> attributeIdMap = new HashMap<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (MANDATORY.equals(attribute.getRuleStrengthId()) && precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
 					attributeIdMap.put(attribute.getAttributeId(), attribute);
 					if ( attributeDomainMap.containsKey(attribute.getAttributeId())) {
-						 attributeDomainMap.get(attribute.getAttributeId()).add(domain.getDomainId());
+						 attributeDomainMap.get(attribute.getAttributeId()).add(domain);
 					} else {
-						List<String> domainList = new ArrayList<>();
-						domainList.add(domain.getDomainId());
+						List<Domain> domainList = new ArrayList<>();
+						domainList.add(domain);
 						attributeDomainMap.put(attribute.getAttributeId(), domainList);
 					}
 				} else {
@@ -244,7 +242,7 @@ public class ValidationService {
 		}
 		
 		for (String attributeId : attributeDomainMap.keySet()) {
-			List<String> domains = attributeDomainMap.get(attributeId);
+			List<Domain> domains = attributeDomainMap.get(attributeId);
 			if (domains.isEmpty()) {
 				LOGGER.error("Attribute:" + attributeId + " has no domain.");
 				continue;
@@ -254,21 +252,25 @@ public class ValidationService {
 				withAttributeButWrongDomainEcl += "(";
 			}
 			int counter = 0;
-			for (String domain : domains) {
+			StringBuilder msgBuilder = new StringBuilder();
+			for (Domain domain : domains) {
 				if (counter++ > 0) {
 					withAttributeButWrongDomainEcl += " OR ";
+					msgBuilder.append(" or ");
 				}
-				withAttributeButWrongDomainEcl += "<<" + domain;
+				withAttributeButWrongDomainEcl += domain.getDomainConstraint();
+				msgBuilder.append(domain.getDomainConstraint());
 			}
 			if (domains.size() > 1) {
 				withAttributeButWrongDomainEcl += ")";
 			}
 			//run ECL query to retrieve failures
 			LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
-			List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
-			processValidationResults(run, queryService, attributeIdMap.get(attributeId), conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_DOMAIN);
+			List<Long> conceptIdsWithAttributeButFromWrongDomains = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
+			processValidationResults(run, queryService, attributeIdMap.get(attributeId), conceptIdsWithAttributeButFromWrongDomains, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
 		}
 	}
+	
 
 	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
 		for (Attribute attribute : domain.getAttributes()) {
@@ -321,7 +323,7 @@ public class ValidationService {
 						conceptIdsWithInvalidAttributeValue.addAll(conceptsWithAnyAttributeValue);
 						conceptIdsWithInvalidAttributeValue.removeAll(conceptsWithAttributeValueWithinRange);
 					} 
-					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE);
+					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null);
 				} else {
 					run.addSkippedAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope.");
 				}
@@ -336,8 +338,8 @@ public class ValidationService {
 	private class MRCMFactory extends ImpotentComponentFactory {
 
 		private static final int domDomainConstraintIndex = 0;
+		private static final int proximalPrimitiveConstraint = 2;
 		private static final int attDomainIdIndex = 0;
-		private static final int ranDomainIdIndex = 0;
 		private static final int ranRangeConstraintIndex = 0;
 		private static final int ranContentTypeIndex = 3;
 		public static final int attContentTypeIndex = 5;
@@ -351,7 +353,8 @@ public class ValidationService {
 				if ("1".equals(active)) {
 					switch (refsetId) {
 						case MRCM_DOMAIN_REFSET:
-							getCreateDomain(referencedComponentId).setDomainConstraint(otherValues[domDomainConstraintIndex]);
+							// use proximal primitive domain constraint instead. see MRCM doc
+							getCreateDomain(referencedComponentId).setDomainConstraint(otherValues[proximalPrimitiveConstraint]);
 							break;
 						case MRCM_ATTRIBUTE_DOMAIN_REFSET:
 							Domain domain = getCreateDomain(otherValues[attDomainIdIndex]);
