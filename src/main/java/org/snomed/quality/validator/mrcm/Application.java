@@ -66,40 +66,40 @@ public class Application {
 		}
 		service.loadMRCM(new File(releasePackage), run);
 		service.validateRelease(new File(releasePackage), run);
-		int totalAttribute = 0; 
-		for (String key: run.getMRCMDomains().keySet()) {
-			Domain domain = run.getMRCMDomains().get(key);
-			totalAttribute += domain.getAttributes().size();
+		createSummaryReport(resultDir, releasePackage, releaseDate, isStatedViewOnly, run);
+		createValidationReport(resultDir, run);
+		
+	}
+
+	private void createValidationReport(File resultDir, ValidationRun run) throws IOException {
+		createValidationFailureReport(resultDir, run.getFailedAssertions(), true);
+		createValidationFailureReport(resultDir, run.getAssertionsWithWarning(), false);
+		createSkippedAssertionsReport(resultDir, run);
+	}
+
+	private void createSkippedAssertionsReport(File resultDir, ValidationRun run) throws IOException {
+		//Report skipped assertions and reasons
+		if (!run.getSkippedAssertions().isEmpty()) {
+			File skippedReport = new File(resultDir,"MRCMValidationSkipped.txt");
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(skippedReport))) {
+				for (Assertion skipped : run.getSkippedAssertions()) {
+					writer.write(skipped.toString());
+					writer.write(NEW_LINE);
+				}
+			}
+			System.out.println("Please see validations skipped report in " + skippedReport.getAbsolutePath());
 		}
-		File report = new File(resultDir,"MrcmValidationReport.txt");
+	}
+
+	private void createValidationFailureReport(File resultDir, Set<Assertion> failures, boolean isErrorReporting) throws IOException {
+		String type = isErrorReporting ? "WithError" : "WithWarning";
+		File report = new File(resultDir,"MrcmValidationReport" + type + ".txt");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
-			StringBuilder reportSummary = new StringBuilder();
-			reportSummary.append("ReleasePackage:" + releasePackage);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("ReportingForReleaseCycle:" + releaseDate);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("isStatedViewOnly:" + isStatedViewOnly);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total MRCM domains loaded:" + run.getMRCMDomains().size());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total MRCM attributes loaded:" + totalAttribute);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total assertions completed:" + run.getCompletedAssertions().size());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total assertions skipped:" + run.getSkippedAssertions().size());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total assertions failed:" + run.getFailedAssertions().size());
-			reportSummary.append(NEW_LINE);
-			writer.write(reportSummary.toString());
-			writer.write(NEW_LINE);
-			writer.write("Failed assertions:");
-			writer.write(NEW_LINE);
-			Set<Assertion> failedAssertions = run.getFailedAssertions();
-			String reportHeader = "Item\tUUID\tAssertion Text\t Failure Message\tCurrent Total\tCurrent Violated Concepts\tPrevious Total\tPrevious Release Violated Concepts";
+			String reportHeader = "Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Current Release\tPrevious Total\tViolated Concepts In Previous Releases";
 			writer.write(reportHeader);
 			writer.write(NEW_LINE);
 			int counter = 1;
-			for (Assertion failed : failedAssertions) {
+			for (Assertion failed : failures) {
 				StringBuilder builder = new StringBuilder();
 				builder.append(counter++);
 				builder.append(TAB);
@@ -121,16 +121,36 @@ public class Application {
 			}
 			System.out.println("Please see validation report in " + report.getAbsolutePath());
 		}
-		//Report skipped assertions and reasons
-		if (!run.getSkippedAssertions().isEmpty()) {
-			File skippedReport = new File(resultDir,"MRCMValidationSkipped.txt");
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(skippedReport))) {
-				for (Assertion skipped : run.getSkippedAssertions()) {
-					writer.write(skipped.toString());
-					writer.write(NEW_LINE);
-				}
-			}
-			System.out.println("Please see validations skipped report in " + skippedReport.getAbsolutePath());
+	}
+	
+	
+	private void createSummaryReport(File resultDir, String releasePackage, String releaseDate, boolean isStatedViewOnly, ValidationRun run) throws IOException {
+		File report = new File(resultDir,"MrcmSummaryReport.txt");
+		int totalAttribute = 0; 
+		for (String key: run.getMRCMDomains().keySet()) {
+			Domain domain = run.getMRCMDomains().get(key);
+			totalAttribute += domain.getAttributes().size();
+		}
+		
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
+			StringBuilder reportSummary = new StringBuilder();
+			reportSummary.append("ReleasePackage:" + releasePackage);
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("ReportingForReleaseCycle:" + releaseDate);
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("isStatedViewOnly:" + isStatedViewOnly);
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("Total MRCM domains loaded:" + run.getMRCMDomains().size());
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("Total MRCM attributes loaded:" + totalAttribute);
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("Total assertions completed:" + run.getCompletedAssertions().size());
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("Total assertions skipped:" + run.getSkippedAssertions().size());
+			reportSummary.append(NEW_LINE);
+			reportSummary.append("Total assertions failed:" + run.getFailedAssertions().size());
+			reportSummary.append(NEW_LINE);
+			writer.write(reportSummary.toString());
 		}
 	}
 
