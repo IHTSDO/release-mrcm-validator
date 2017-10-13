@@ -7,37 +7,54 @@ import java.util.UUID;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 
 public class Assertion {
+	public static enum FailureType {
+		ERROR("error"),
+		WARNING("warning");
+		String value;
+		
+		FailureType(String value) {
+			this.value = value;
+		}
+		
+		String getValue() {
+			return this.value;
+		}
+	}
+
 	private final UUID uuid;
-	private final Attribute attribute;
+	private Attribute attribute;
 	private List<Long> currentViolatedConceptIds;
 	private List<Long> previousViolatedConceptIds;
 	private final String message;
 	private ValidationType validationType;
+	private FailureType failureType;
 	private String domainConstraint;
 	
-	public Assertion(Attribute attribute, ValidationType type, String msg) {
-		this.attribute = attribute;
+	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType) {
 		this.uuid = attribute.getUuid();
+		this.attribute = attribute;
+		this.validationType = type;
 		this.message = msg;
+		this.failureType = failureType;
 		this.currentViolatedConceptIds = new ArrayList<>();
 		this.previousViolatedConceptIds = new ArrayList<>();
-		this.validationType = type;
+		domainConstraint = null;
 	}
 	
-	public Assertion(Attribute attribute, ValidationType type, String msg, List<Long> currentViolatedConceptIds) {
-		this(attribute, type, msg);
+	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType, List<Long> currentViolatedConceptIds) {
+		this(attribute, type, msg, failureType);
 		this.currentViolatedConceptIds = currentViolatedConceptIds == null ?  
 				new ArrayList<>() : currentViolatedConceptIds;
 		
 	}
-	
-	public Assertion(Attribute attribute, ValidationType type, String msg, 
+		
+	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType,
 			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds, String domainConstraint) {
-		this(attribute, type, msg, currentViolatedConceptIds);
+		this(attribute, type, msg, failureType, currentViolatedConceptIds);
 		this.previousViolatedConceptIds = previousViolatedConceptIds == null ? new ArrayList<>() : previousViolatedConceptIds;
 		this.domainConstraint = domainConstraint;
 	}
-	
+
 	public List<Long> getPreviousViolatedConceptIds() {
 		return previousViolatedConceptIds;
 	}
@@ -51,6 +68,22 @@ public class Assertion {
 				|| (previousViolatedConceptIds != null && !previousViolatedConceptIds.isEmpty());
 	}
 	
+	public boolean reportAsError() {
+		//default to error
+		if (FailureType.WARNING == failureType ) {
+			return false;
+		}
+		return true;
+	}
+	
+	public boolean reportAsWarning() {
+		//default to error
+		if (FailureType.WARNING == failureType ) {
+			return true;
+		}
+		return false;
+	}
+	
 	public String getAssertionText() {
 		String assertionText = String.format("MRCM rule must be applied to attribute:%s for content type:%s within %s constraint:", 
 				attribute.getAttributeId(), attribute.getContentTypeId(), validationType.getName().toLowerCase());
@@ -60,15 +93,23 @@ public class Assertion {
 			assertionText += " [" + attribute.getAttributeIngroupCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			assertionText += " " + attribute.getRangeConstraint();
-		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType && domainConstraint != null) {
-			assertionText += " " + this.domainConstraint;
+		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
+			assertionText +=  domainConstraint != null ? domainConstraint : " ";
 		}
 		return assertionText;
+	}
+	
+	public FailureType getFailureType() {
+		return this.failureType;
+	}
+	
+	public Attribute getAttribute() {
+		return this.attribute;
 	}
 
 	@Override
 	public String toString() {
-		String base = "Assertion [uuid=" + uuid + ", attribute=" + attribute + ",validationType=" + validationType;
+		String base = "Assertion [uuid=" + uuid + ", assertionText=" + getAssertionText() + ",validationType=" + validationType;
 		if (message != null && !message.isEmpty()) {
 			return base + " message=" + message + "]";
 		} else {
@@ -78,10 +119,6 @@ public class Assertion {
 
 	public UUID getUuid() {
 		return uuid;
-	}
-
-	public Attribute getAttribute() {
-		return attribute;
 	}
 
 	public List<Long> getCurrentViolatedConceptIds() {
@@ -97,10 +134,10 @@ public class Assertion {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + ((attribute == null) ? 0 : attribute.hashCode());
+		result = prime * result + ((failureType == null) ? 0 : failureType.hashCode());
 		result = prime * result + ((message == null) ? 0 : message.hashCode());
 		result = prime * result + ((uuid == null) ? 0 : uuid.hashCode());
 		result = prime * result + ((validationType == null) ? 0 : validationType.hashCode());
-		result = prime * result + ((currentViolatedConceptIds == null) ? 0 : currentViolatedConceptIds.hashCode());
 		return result;
 	}
 
@@ -118,6 +155,8 @@ public class Assertion {
 				return false;
 		} else if (!attribute.equals(other.attribute))
 			return false;
+		if (failureType != other.failureType)
+			return false;
 		if (message == null) {
 			if (other.message != null)
 				return false;
@@ -130,12 +169,8 @@ public class Assertion {
 			return false;
 		if (validationType != other.validationType)
 			return false;
-		if (currentViolatedConceptIds == null) {
-			if (other.currentViolatedConceptIds != null)
-				return false;
-		} else if (!currentViolatedConceptIds.equals(other.currentViolatedConceptIds))
-			return false;
 		return true;
 	}
+	
 	
 }

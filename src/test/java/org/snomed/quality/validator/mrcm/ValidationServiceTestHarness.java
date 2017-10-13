@@ -22,7 +22,7 @@ public class ValidationServiceTestHarness {
 		ValidationRun run = new ValidationRun("20180131",true);
 		validationService.loadMRCM(releaseTestFile,run);
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
-		String attributeId = "47429007";
+		String attributeId = "272741003";
 		Map<String, Domain> domainsToValidate = new HashMap<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {

@@ -59,8 +59,8 @@ public class ValidationServiceTest {
 	public void testValidRelease() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(231,run.getCompletedAssertions().size());
-		assertEquals(146,run.getSkippedAssertions().size());
+		assertEquals(237,run.getCompletedAssertions().size());
+		assertEquals(140,run.getSkippedAssertions().size());
 		assertEquals(4,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);
@@ -96,9 +96,8 @@ public class ValidationServiceTest {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_DOMAIN));
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(85,run.getCompletedAssertions().size());
-		assertEquals(1,run.getSkippedAssertions().size());
-		System.out.println(run.getSkippedAssertions().iterator().next().getMessage());
+		assertEquals(86,run.getCompletedAssertions().size());
+		assertEquals(0,run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);
@@ -116,9 +115,9 @@ public class ValidationServiceTest {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_RANGE));
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(81,run.getCompletedAssertions().size());
+		assertEquals(85,run.getCompletedAssertions().size());
 		//skipped assertions
-		assertEquals(8, run.getSkippedAssertions().size());
+		assertEquals(4, run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);
@@ -134,8 +133,8 @@ public class ValidationServiceTest {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_CARDINALITY));
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(1,run.getCompletedAssertions().size());
-		assertEquals(100,run.getSkippedAssertions().size());
+		assertEquals(2,run.getCompletedAssertions().size());
+		assertEquals(99,run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);

@@ -1,6 +1,5 @@
 package org.snomed.quality.validator.mrcm;
 
-import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Domain;
 
 import java.util.ArrayList;
@@ -44,21 +43,21 @@ public class ValidationRun {
 		return MRCMDomains;
 	}
 
-	public void addSkippedAssertion(Attribute attribute, ValidationType type, String msg) {
-		assertionSkipped.add(new Assertion(attribute, type, "Skipped reason:" + msg));
+	public void addSkippedAssertion(Assertion skippedAssertion) {
+		assertionSkipped.add(skippedAssertion);
 	}
-	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, 
-			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds, String domainConstraint) {
-		assertionsCompleted.add(new Assertion(attribute, type, message, currentViolatedConceptIds, previousViolatedConceptIds, domainConstraint));
+	public void addCompletedAssertion(Assertion completedAssertion) {
+		assertionsCompleted.add(completedAssertion);
 	}
 	
-	public void addCompletedAssertion(Attribute attribute, ValidationType type, String message, List<Long> currentViolatedConceptIds) {
-		assertionsCompleted.add(new Assertion(attribute, type, message, currentViolatedConceptIds));
-	}
-
 	public Set<Assertion> getFailedAssertions() {
-		return assertionsCompleted.stream().filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
+		return assertionsCompleted.stream().filter(Assertion:: reportAsError).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
+	
+	public Set<Assertion> getAssertionsWithWarning() {
+		return assertionsCompleted.stream().filter(Assertion :: reportAsWarning).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
+	}
+	
 	public List<Assertion> getCompletedAssertions() {
 		return assertionsCompleted;
 	}
