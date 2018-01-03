@@ -109,7 +109,7 @@ public class Assertion {
 
 	@Override
 	public String toString() {
-		String base = "Assertion [uuid=" + uuid + ", assertionText=" + getAssertionText() + ",validationType=" + validationType;
+		String base = "Assertion [uuid=" + uuid + ", assertionText=" + getAssertionText() + ",validationType=" + validationType + ",failureType=" + failureType.toString();
 		if (message != null && !message.isEmpty()) {
 			return base + " message=" + message + "]";
 		} else {

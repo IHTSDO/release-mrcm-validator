@@ -61,7 +61,8 @@ public class ValidationService {
 	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException, ParseException {
 		LoadingProfile profile = run.isStatedView() ? 
 				LoadingProfile.light.withFullRelationshipObjects().withStatedRelationships()
-				.withStatedAttributeMapOnConcept().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET).withoutInferredAttributeMapOnConcept() : LoadingProfile.light.withFullRelationshipObjects().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET);
+				.withStatedAttributeMapOnConcept().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET).withoutInferredAttributeMapOnConcept() 
+				: LoadingProfile.light.withFullRelationshipObjects().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET);
 		ReleaseStore releaseStore = new ReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
 		//checking data is loaded properly
@@ -229,12 +230,107 @@ public class ValidationService {
 	 *  
 	 *  ECL: (*:<<272741003=*) MINUS (<<91723000 OR <<723264001)
 	 *  ECL: (*:<<272741003=*) MINUS <<91723000
+	 *  
+	 *  << ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|
 	 * @throws ServiceException *
 	 * 
 	*/
 	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
-		Map<String, Attribute> attributeIdMap = new HashMap<>();
+		Map<String, List<Attribute>> attributesById = new HashMap<>();
+		filterAttributeDomainByStrength(run, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
+		
+		for (String attributeId : attributeDomainMap.keySet()) {
+			List<Domain> domains = attributeDomainMap.get(attributeId);
+			if (domains.isEmpty()) {
+				LOGGER.error("Attribute:" + attributeId + " has no domain.");
+				continue;
+			}
+			boolean nestedQueryFound = containNestedEclQuery(domains);
+			List<Long> violatedConcepts = new ArrayList<>();
+			StringBuilder msgBuilder = new StringBuilder();
+			if (nestedQueryFound) {
+				violatedConcepts = processNestedDomainConstraintQuery(queryService, attributeId, domains, msgBuilder);
+			} else {
+				violatedConcepts = processNonNestedDomainConstraintQuery(queryService, attributeId, domains, msgBuilder);
+			}
+			
+			for (Attribute attribute : attributesById.get(attributeId)) {
+				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
+			}
+		}
+	}
+
+	private List<Long> processNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId, List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
+		 List<Long> violatedConcepts = new ArrayList<>();
+		String withAttributeQuery = "*:<< " + attributeId + "=*";
+		List<Long> conceptsWithAttribute = queryService.eclQueryReturnConceptIdentifiers(withAttributeQuery, 0, -1).getConceptIds();
+		List<Long> result = new ArrayList<>();
+		for (Domain domain : domains) {
+			msgBuilder.append(domain.getDomainConstraint());
+			List<String> nestedQueries = splitNestedQuery(domain.getDomainConstraint());
+			if (nestedQueries.size() > 2) {
+				String msg = "Found more than two queries nested which is not currently supported yet.";
+				LOGGER.error(msg);
+				continue;
+			}
+			List<Long> domainQueryResult = queryService.eclQueryReturnConceptIdentifiers( nestedQueries.get(0) + "*", 0, -1).getConceptIds();
+			result.addAll(domainQueryResult);
+			if (nestedQueries.size() > 1) {
+				for (Long id : domainQueryResult) {
+					result.addAll(queryService.eclQueryReturnConceptIdentifiers(nestedQueries.get(1) + id, 0, -1).getConceptIds());
+				}
+			}
+		}
+		for (Long id : conceptsWithAttribute) {
+			if (!result.contains(id)) {
+				violatedConcepts.add(id);
+			}
+		}
+		return violatedConcepts;
+	}
+
+	private List<String> splitNestedQuery(String nestedDomainQuery) {
+		List<String> splits = new ArrayList<>();
+		if (nestedDomainQuery.startsWith("<<")) {
+			splits.add(nestedDomainQuery.substring(2).trim());
+			splits.add("<<");
+		} else if (nestedDomainQuery.startsWith("^")) {
+			splits.add(nestedDomainQuery.substring(1).trim());
+			splits.add("^");
+		} else {
+			splits.add(nestedDomainQuery);
+		}
+		return splits;
+	}
+
+	private List<Long> processNonNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId,
+			List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
+		List<Long> violatedConcepts;
+		String withAttributeButWrongDomainEcl = "(*:<<" + attributeId + "=*) MINUS ";
+		if (domains.size() > 1) {
+			withAttributeButWrongDomainEcl += "(";
+		}
+		int counter = 0;
+		for (Domain domain : domains) {
+			if (counter++ > 0) {
+				withAttributeButWrongDomainEcl += " OR ";
+				msgBuilder.append(" OR ");
+			}
+			withAttributeButWrongDomainEcl += domain.getDomainConstraint();
+			msgBuilder.append(domain.getDomainConstraint());
+		}
+		if (domains.size() > 1) {
+			withAttributeButWrongDomainEcl += ")";
+		}
+		//run ECL query to retrieve failures
+		LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
+		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
+		return violatedConcepts;
+	}
+
+	private void filterAttributeDomainByStrength(ValidationRun run, List<Long> precoordinatedTypes, String ruleStrengh,
+			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				//There are cases that domain rule is optional e.g 723264001 for Laterality attribute
@@ -242,7 +338,13 @@ public class ValidationService {
 					continue;
 				}
 				if (precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
-					attributeIdMap.put(attribute.getAttributeId(), attribute);
+					if (attributesById.containsKey(attribute.getAttributeId())) {
+						attributesById.get(attribute.getAttributeId()).add(attribute);
+					} else {
+						List<Attribute> attributeList = new ArrayList<>();
+						attributeList.add(attribute);
+						attributesById.put(attribute.getAttributeId(), attributeList);
+					}
 					if ( attributeDomainMap.containsKey(attribute.getAttributeId())) {
 						 attributeDomainMap.get(attribute.getAttributeId()).add(domain);
 					} else {
@@ -256,37 +358,17 @@ public class ValidationService {
 				}
 			}
 		}
-		
-		for (String attributeId : attributeDomainMap.keySet()) {
-			List<Domain> domains = attributeDomainMap.get(attributeId);
-			if (domains.isEmpty()) {
-				LOGGER.error("Attribute:" + attributeId + " has no domain.");
-				continue;
-			}
-			String withAttributeButWrongDomainEcl = "(*:<<" + attributeId + "=*) MINUS ";
-			if (domains.size() > 1) {
-				withAttributeButWrongDomainEcl += "(";
-			}
-			int counter = 0;
-			StringBuilder msgBuilder = new StringBuilder();
-			for (Domain domain : domains) {
-				if (counter++ > 0) {
-					withAttributeButWrongDomainEcl += " OR ";
-					msgBuilder.append(" OR ");
-				}
-				withAttributeButWrongDomainEcl += domain.getDomainConstraint();
-				msgBuilder.append(domain.getDomainConstraint());
-			}
-			if (domains.size() > 1) {
-				withAttributeButWrongDomainEcl += ")";
-			}
-			//run ECL query to retrieve failures
-			LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
-			List<Long> conceptIdsWithAttributeButFromWrongDomains = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
-			processValidationResults(run, queryService, attributeIdMap.get(attributeId), conceptIdsWithAttributeButFromWrongDomains, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
-		}
 	}
-	
+
+	private boolean containNestedEclQuery(List<Domain> domains) {
+		//check whether the domain constraint is a nested expression e.g << ^ 723264001
+		for (Domain domain : domains) {
+			if (domain.getDomainConstraint().contains("<<") && domain.getDomainConstraint().contains("^")) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
 		for (Attribute attribute : domain.getAttributes()) {
@@ -318,14 +400,6 @@ public class ValidationService {
 					String matchAttributeValuesWithinRange = containsMultipleSCTIDs(rangeConstraint)
 							? baseEcl + "(" + rangeConstraint + ")"
 									: baseEcl + rangeConstraint;
-
-//					if (matchAttributeValuesWithinRange.contains("[")) {
-//						String msg = "Cardinality is not currently supported. This assertion will be skipped." + "ECL:" + matchAttributeValuesWithinRange;
-//						LOGGER.warn(msg);
-//						run.addSkippedAssertion(constructAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, msg));
-//						continue;
-//					}
-
 					// All concepts
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domainConstraint, attributeId, matchAllAttributeValues);
 					List<Long> conceptsWithAnyAttributeValue = queryService.eclQueryReturnConceptIdentifiers(matchAllAttributeValues, 0, -1).getConceptIds();
@@ -361,7 +435,7 @@ public class ValidationService {
 		public static final int attContentTypeIndex = 5;
 
 		private Map<String, Domain> domains = new HashMap<>();
-		private Map<String, List<Attribute>> attributes = new HashMap<>();
+		private Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
@@ -391,10 +465,10 @@ public class ValidationService {
 
 		private void updateAttributeRange(String attributeId, Domain domain) {
 			for (Attribute attribute : domain.getAttributes()) {
-				if (attributes.get(attribute.getAttributeId()) == null) {
+				if (attributeRangeMap.get(attribute.getAttributeId()) == null) {
 					return;
 				}
-				for (Attribute range : attributes.get(attribute.getAttributeId())) {
+				for (Attribute range : attributeRangeMap.get(attribute.getAttributeId())) {
 					domain.addAttributeRange(range);
 				}
 			}
@@ -403,8 +477,8 @@ public class ValidationService {
 		private void updateDomainWithAttributeRange() {
 			for (Domain domain : domains.values()) {
 				for (Attribute attribute : domain.getAttributes()) {
-					if (attributes.containsKey(attribute.getAttributeId())) {
-						for (Attribute range : attributes.get(attribute.getAttributeId())) {
+					if (attributeRangeMap.containsKey(attribute.getAttributeId())) {
+						for (Attribute range : attributeRangeMap.get(attribute.getAttributeId())) {
 							domain.addAttributeRange(range);
 						}
 					}
@@ -445,12 +519,12 @@ public class ValidationService {
 			attribute.setRangeConstraint(otherValues[ranRangeConstraintIndex]);
 			attribute.setRuleStrengthId(otherValues[2]);
 			attribute.setType(Type.RANGE);
-			if (attributes.containsKey(attribute.getAttributeId())) {
-				attributes.get(attribute.getAttributeId()).add(attribute);
+			if (attributeRangeMap.containsKey(attribute.getAttributeId())) {
+				attributeRangeMap.get(attribute.getAttributeId()).add(attribute);
 			} else {
 				List<Attribute> list = new ArrayList<>();
 				list.add(attribute);
-				attributes.put(attributeId,list);
+				attributeRangeMap.put(attributeId,list);
 			}
 			updateDomainWithAttributeRange();
 			return attribute;

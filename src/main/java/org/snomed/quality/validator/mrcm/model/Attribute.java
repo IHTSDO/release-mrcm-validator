@@ -99,10 +99,11 @@ public class Attribute {
 		result = prime * result + ((contentTypeId == null) ? 0 : contentTypeId.hashCode());
 		result = prime * result + (isGrouped ? 1231 : 1237);
 		result = prime * result + ((rangeConstraint == null) ? 0 : rangeConstraint.hashCode());
+		result = prime * result + ((ruleStrengthId == null) ? 0 : ruleStrengthId.hashCode());
 		result = prime * result + ((type == null) ? 0 : type.hashCode());
 		return result;
 	}
-	
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -138,6 +139,11 @@ public class Attribute {
 			if (other.rangeConstraint != null)
 				return false;
 		} else if (!rangeConstraint.equals(other.rangeConstraint))
+			return false;
+		if (ruleStrengthId == null) {
+			if (other.ruleStrengthId != null)
+				return false;
+		} else if (!ruleStrengthId.equals(other.ruleStrengthId))
 			return false;
 		if (type != other.type)
 			return false;

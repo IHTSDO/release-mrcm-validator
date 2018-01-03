@@ -75,6 +75,20 @@ public class Application {
 		createValidationFailureReport(resultDir, run.getFailedAssertions(), true);
 		createValidationFailureReport(resultDir, run.getAssertionsWithWarning(), false);
 		createSkippedAssertionsReport(resultDir, run);
+		createSuccessfulValidationReport(resultDir, run);
+	}
+
+	private void createSuccessfulValidationReport(File resultDir, ValidationRun run) throws IOException {
+		if (!run.getCompletedAssertions().isEmpty()) {
+			File successReport = new File(resultDir,"MRCMValidationPassed.txt");
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(successReport))) {
+				for (Assertion passed : run.getCompletedAssertions()) {
+					writer.write(passed.toString());
+					writer.write(NEW_LINE);
+				}
+			}
+			System.out.println("Please see completed successfull validations report in " + successReport.getAbsolutePath());
+		}
 	}
 
 	private void createSkippedAssertionsReport(File resultDir, ValidationRun run) throws IOException {

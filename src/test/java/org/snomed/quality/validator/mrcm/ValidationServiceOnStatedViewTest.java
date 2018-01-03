@@ -61,7 +61,7 @@ public class ValidationServiceOnStatedViewTest {
 	public void testValidRelease() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(237,run.getCompletedAssertions().size());
+		assertEquals(252,run.getCompletedAssertions().size());
 		assertEquals(140,run.getSkippedAssertions().size());
 		assertEquals(4,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
