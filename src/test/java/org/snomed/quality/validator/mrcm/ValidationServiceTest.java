@@ -7,10 +7,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.junit.Before;
 import org.junit.Test;
+import org.snomed.quality.validator.mrcm.Assertion.FailureType;
 import org.snomed.quality.validator.mrcm.ValidationRun;
 import org.snomed.quality.validator.mrcm.ValidationType;
 import org.snomed.quality.validator.mrcm.ValidationService;
@@ -59,7 +61,7 @@ public class ValidationServiceTest {
 	public void testValidRelease() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(237,run.getCompletedAssertions().size());
+		assertEquals(252,run.getCompletedAssertions().size());
 		assertEquals(140,run.getSkippedAssertions().size());
 		assertEquals(4,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
@@ -70,8 +72,6 @@ public class ValidationServiceTest {
 	@Test
 	public void testValidReleaseForSpecificAttribute() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
-//		String attributeId ="363698007";
-//		String attributeId = "408729009";
 		String attributeId = "272741003";
 		Map<String, Domain> domainsToValidate = new HashMap<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
@@ -96,7 +96,7 @@ public class ValidationServiceTest {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_DOMAIN));
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(86,run.getCompletedAssertions().size());
+		assertEquals(101,run.getCompletedAssertions().size());
 		assertEquals(0,run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
@@ -163,6 +163,37 @@ public class ValidationServiceTest {
 			assertEquals(1,assertion.getCurrentViolatedConceptIds().size());
 			List<Long> expected = Arrays.asList(Long.valueOf("404684003"));
 			assertEquals(expected,assertion.getCurrentViolatedConceptIds());
+		}
+	}
+	
+	
+	@Test
+	public void testSpecificAttributeDomainValidationWithWarning() throws Exception {
+		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
+		String attributeId = "272741003";
+		String domainId = "723264001";
+		Map<String, Domain> domainsToValidate = new HashMap<>();
+		for (Domain domain : run.getMRCMDomains().values()) {
+			if (!domain.getDomainId().equals(domainId)) {
+				continue;
+			}
+			for (Attribute attribute : domain.getAttributes()) {
+				if (attribute.getAttributeId().equals(attributeId)) {
+					domainsToValidate.put(domain.getDomainId(), domain);
+				}
+			}
+		}
+		run.setMRCMDomains(domainsToValidate);
+		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_DOMAIN));
+		validationService.validateRelease(releaseTestFile, run);
+		assertEquals(1, run.getAssertionsWithWarning().size());
+		for (Assertion assertion : run.getAssertionsWithWarning()) {
+			System.out.println(assertion.getAssertionText());
+			System.out.println(assertion);
+			assertEquals(attributeId, assertion.getAttribute().getAttributeId());
+			assertEquals(FailureType.WARNING, assertion.getFailureType());
+			assertEquals(6, assertion.getCurrentViolatedConceptIds().size());
+			
 		}
 	}
 	
