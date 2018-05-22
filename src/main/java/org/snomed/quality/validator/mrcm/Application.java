@@ -1,23 +1,19 @@
 package org.snomed.quality.validator.mrcm;
 
-import org.ihtsdo.otf.snomedboot.ReleaseImportException;
-import org.ihtsdo.otf.sqs.service.exception.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.snomed.quality.validator.mrcm.model.Attribute;
-import org.snomed.quality.validator.mrcm.model.Domain;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.attribute.FileAttribute;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Set;
+
+import org.ihtsdo.otf.snomedboot.ReleaseImportException;
+import org.ihtsdo.otf.sqs.service.exception.ServiceException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.snomed.quality.validator.mrcm.model.Domain;
 
 public class Application {
 
@@ -34,12 +30,12 @@ public class Application {
 		File resultDir = null;
 		boolean isStatedViewOnly = true;
 		if ( args == null || args.length < 4) {
-			String msg = "Please specifiy the java arguments after replacing the {} with actual values." + "{releasePackageFullPathName} {true of false} {20180131} {result_dir}";
+			String msg = "Please specifiy the java arguments after replacing the {} with actual values." + "{release_package_unzipped_root} {is_stated_only} {release_date} {result_dir}";
 			System.out.println(msg);
-			System.out.println("Java argument 1 is for the release package unzipped full file path. (required):" + " eg:/Users/mchu/Releases/international/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
-			System.out.println("Java argument 2 is to state whether to use stated relationships. (optional default to true):" + "e.g false (implies to use inferred instead.)");
-			System.out.println("Java argument 3 is the release date for current new content(optional):" + " e.g 20170731.(Note: Don't specify this argument when testing for all failures.)");
-			System.out.println("Java argument 4 is the directory where validation reports will be saved.");
+			System.out.println("{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/mchu/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
+			System.out.println("{is_stated_only} is to state whether to use stated relationships only. This parameter is optional and the default is set to true when not specified.");
+			System.out.println("{release_date} is the effective date for the release file that is being validated.The format is yyyyMMdd eg:20170731");
+			System.out.println("{result_dir} is the directory where validation reports will be saved.");
 			throw new IllegalStateException(msg);
 		} else {
 			releasePackage = args[0];
