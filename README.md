@@ -26,5 +26,5 @@ The following reports will be listed in {result_dir} folder.
 * MrcmSummaryReport.txt
 * MrcmValidationReportWithError.txt                 
 * MrcmValidationReportWithWarning.txt 
-* RCMValidationPassed.txt                          
+* MRCMValidationPassed.txt                          
 * MRCMValidationSkipped.txt
