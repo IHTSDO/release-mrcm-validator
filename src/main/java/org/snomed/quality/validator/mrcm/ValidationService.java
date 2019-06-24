@@ -2,17 +2,28 @@ package org.snomed.quality.validator.mrcm;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.snomedboot.ReleaseImporter;
+import org.ihtsdo.otf.snomedboot.domain.Concept;
+import org.ihtsdo.otf.snomedboot.domain.ConceptConstants;
 import org.ihtsdo.otf.snomedboot.factory.ImpotentComponentFactory;
 import org.ihtsdo.otf.snomedboot.factory.LoadingProfile;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentFactoryImpl;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStore;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ConceptImpl;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.RelationshipImpl;
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
+import org.ihtsdo.otf.sqs.service.store.RamReleaseStore;
 import org.ihtsdo.otf.sqs.service.store.ReleaseStore;
+import org.semanticweb.owlapi.io.OWLParserException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.snomed.otf.owltoolkit.conversion.AxiomRelationshipConversionService;
+import org.snomed.otf.owltoolkit.conversion.ConversionException;
+import org.snomed.otf.owltoolkit.domain.AxiomRepresentation;
+import org.snomed.otf.owltoolkit.domain.Relationship;
 import org.snomed.quality.validator.mrcm.Assertion.FailureType;
-import org.snomed.quality.validator.mrcm.ValidationType;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Attribute.Type;
 import org.snomed.quality.validator.mrcm.model.Domain;
@@ -29,6 +40,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static java.lang.Long.parseLong;
+
 public class ValidationService {
 	private static final String CONTENT_TYPE_IS_OUT_OF_SCOPE = "Content type is out of scope:";
 	private static final String NO_CARDINALITY_CONSTRAINT = "0..*";
@@ -38,6 +51,7 @@ public class ValidationService {
 	public static final String MRCM_ATTRIBUTE_DOMAIN_REFSET = "723561005";
 	public static final String MRCM_ATTRIBUTE_RANGE_REFSET = "723562003";
 	public static final String LATERALIZABLE_BODY_STRUCTURE_REFSET = "723264001";
+	public static final String OWL_AXIOM_REFSET = "733073007";
 	public static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
 			.withFullRefsetMemberObjects()
@@ -45,6 +59,8 @@ public class ValidationService {
 	public static final String ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT = "723593002";
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
+
+	private Set<Long> ungroupedAttributes = new HashSet<>();
 	
 
 	public void loadMRCM(File sourceDirectory, ValidationRun run) throws ReleaseImportException {
@@ -59,12 +75,15 @@ public class ValidationService {
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException, ParseException {
-		LoadingProfile profile = run.isStatedView() ? 
+		LoadingProfile profile = run.isStatedView() ?
 				LoadingProfile.light.withFullRelationshipObjects().withStatedRelationships()
-				.withStatedAttributeMapOnConcept().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET).withoutInferredAttributeMapOnConcept() 
-				: LoadingProfile.light.withFullRelationshipObjects().withRefset(LATERALIZABLE_BODY_STRUCTURE_REFSET);
-		ReleaseStore releaseStore = new ReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile);
+				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
+				: LoadingProfile.light.withFullRelationshipObjects().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+
+        OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore());
+		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionFactory);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
+
 		//checking data is loaded properly
 		LOGGER.info("Total concepts loaded:" + queryService.getConceptCount());
 		
@@ -450,7 +469,8 @@ public class ValidationService {
 							Domain domain = getCreateDomain(otherValues[attDomainIdIndex]);
 							Attribute attribute = createAttributeDomain(id, referencedComponentId, otherValues);
 							domain.addAttribute(attribute);
-							updateAttributeRange(attribute.getAttributeId(),domain);
+							updateAttributeRange(attribute.getAttributeId(), domain);
+							loadUngroupedAttributes(active, referencedComponentId, otherValues);
 							break;
 						case MRCM_ATTRIBUTE_RANGE_REFSET:
 							createAttributeRange(id, referencedComponentId, otherValues);
@@ -496,9 +516,9 @@ public class ValidationService {
 			}
 			return domains.get(referencedComponentId);
 		}
-		
-		public Attribute createAttributeDomain(String id,String attributeId, String ... otherValues) {
-			Attribute attribute = new Attribute(attributeId,  otherValues[attContentTypeIndex]);
+
+		public Attribute createAttributeDomain(String id, String attributeId, String... otherValues) {
+			Attribute attribute = new Attribute(attributeId, otherValues[attContentTypeIndex]);
 			if (id != null && !id.isEmpty()) {
 				attribute.setUuid(UUID.fromString(id));
 			}
@@ -510,8 +530,7 @@ public class ValidationService {
 			return attribute;
 		}
 
-		
-		public Attribute createAttributeRange (String uuid, String attributeId,String... otherValues) {
+		public Attribute createAttributeRange(String uuid, String attributeId, String... otherValues) {
 			Attribute attribute = new Attribute(attributeId, otherValues[ranContentTypeIndex]);
 			if (uuid != null && !uuid.isEmpty()) {
 				attribute.setUuid(UUID.fromString(uuid));
@@ -524,10 +543,105 @@ public class ValidationService {
 			} else {
 				List<Attribute> list = new ArrayList<>();
 				list.add(attribute);
-				attributeRangeMap.put(attributeId,list);
+				attributeRangeMap.put(attributeId, list);
 			}
 			updateDomainWithAttributeRange();
 			return attribute;
 		}
+
+		private void loadUngroupedAttributes(String active, String referencedComponentId, String... otherValues) {
+			if ("1".equals(active)) {
+				// id	effectiveTime	active	moduleId	refsetId	referencedComponentId	domainId	grouped	attributeCardinality	attributeInGroupCardinality	ruleStrengthId	contentTypeId
+				// 																otherValues .. 	0			1		2						3							4				5
+				// Ungrouped attribute
+				if ("0".equals(otherValues[1])) {
+					ungroupedAttributes.add(parseLong(referencedComponentId));
+				}
+			}
+		}
 	}
+
+	private class OWLExpressionFactory extends ComponentFactoryImpl {
+
+		private static final String OWL_AXIOM_REFSET = "733073007";
+		private final AxiomRelationshipConversionService axiomConverter;
+		private final Logger logger = LoggerFactory.getLogger(getClass());
+		private final ComponentStore componentStore;
+
+		public OWLExpressionFactory(ComponentStore componentStore) {
+			super(componentStore);
+			this.componentStore = componentStore;
+			axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
+		}
+
+		@Override
+		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
+			synchronized (this) {
+				if("1".equals(active) && OWL_AXIOM_REFSET.equals(refsetId)) {
+					// OWL OntologyAxiom reference set
+					// Fields: id	effectiveTime	active	moduleId	refsetId	referencedComponentId	owlExpression
+					String owlExpression = otherValues[0];
+					try {
+						//AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(parseLong(referencedComponentId), owlExpression);
+						AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(owlExpression);
+						if (axiom != null) {
+							if (axiom.getLeftHandSideNamedConcept() != null && axiom.getRightHandSideRelationships() != null) {
+								// Regular axiom
+								addRelationships(id, axiom.getLeftHandSideNamedConcept(), axiom.getRightHandSideRelationships(), moduleId, effectiveTime);
+							} else if (axiom.getRightHandSideNamedConcept() != null && axiom.getLeftHandSideRelationships() != null) {
+								// GCI OntologyAxiom
+                                // Skip GCI Axioms
+								//addRelationships(id,  axiom.getRightHandSideNamedConcept(), axiom.getLeftHandSideRelationships(), moduleId, effectiveTime);
+								logger.info("GCI axiom id {}", id);
+							}
+						}
+					} catch (ConversionException | OWLParserException e) {
+						logger.error("OntologyAxiom conversion failed for refset member {}", id, e);
+					}
+				}
+			}
+		}
+
+		private void addRelationships(String axiomId, Long namedConcept, Map<Integer, List<Relationship>> groups, String moduleId, String effectiveTime) {
+			groups.forEach((group, relationships) -> relationships.forEach(relationship -> {
+				String typeId = String.valueOf(relationship.getTypeId());
+				String destinationId = String.valueOf(relationship.getDestinationId());
+
+				// Build a composite identifier for this 'relationship' (which is actually a fragment of an axiom expression) because it doesn't have its own component identifier.
+				String compositeIdentifier = axiomId + "/Group_" + group + "/Type_" + typeId + "/Destination_" + destinationId;
+				newRelationshipState(compositeIdentifier, effectiveTime, "1", moduleId, namedConcept.toString(), destinationId, String.valueOf(group), typeId, ConceptConstants.STATED_RELATIONSHIP,  "900000000000451002");
+				logger.info("Add axiom relationship {}", compositeIdentifier);
+				
+				this.addStatedConceptAttribute(namedConcept.toString(), typeId, destinationId);
+				if(ConceptConstants.isA.equals(typeId)) {
+					this.addStatedConceptParent(namedConcept.toString(), destinationId);
+					this.addStatedConceptChild(namedConcept.toString(), destinationId);
+				}
+			}));
+		}
+
+        private ComponentStore getComponentStore() {
+            return this.componentStore;
+        }
+
+	}
+
+	private class MRCMValidatorReleaseImportManager extends ReleaseImportManager {
+
+        private ReleaseImporter releaseImporter;
+
+        public MRCMValidatorReleaseImportManager() {
+            releaseImporter = new ReleaseImporter();
+        }
+
+        public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+            return loadReleaseFiledToStore(releaseDirectory, loadingProfile, new RamReleaseStore(), componentFactory);
+        }
+
+        private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+            releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory);
+            final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
+            return writeToIndex(conceptMap, releaseStore, loadingProfile);
+        }
+    }
 }
