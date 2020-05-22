@@ -8,8 +8,6 @@ import org.ihtsdo.otf.snomedboot.factory.ImpotentComponentFactory;
 import org.ihtsdo.otf.snomedboot.factory.LoadingProfile;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentFactoryImpl;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStore;
-import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ConceptImpl;
-import org.ihtsdo.otf.snomedboot.factory.implementation.standard.RelationshipImpl;
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
@@ -31,14 +29,7 @@ import org.springframework.util.Assert;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import static java.lang.Long.parseLong;
 
@@ -74,7 +65,15 @@ public class ValidationService {
 		run.setMRCMDomains(domains);
 	}
 
-	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException, ParseException {
+	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
+		executeValidation(releaseDirectory, run, modules);
+	}
+
+	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
+		executeValidation(releaseDirectory, run, Collections.EMPTY_SET);
+	}
+
+	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
 		LoadingProfile profile = run.isStatedView() ?
 				LoadingProfile.light.withFullRelationshipObjects().withStatedRelationships()
 				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
@@ -92,16 +91,16 @@ public class ValidationService {
 		for (ValidationType type : run.getValidationTypes()) {
 			switch (type) {
 			case ATTRIBUTE_DOMAIN :
-				executeAttributeDomainValidation(run, queryService, precoordinatedTypes);
+				executeAttributeDomainValidation(run, queryService, precoordinatedTypes, modules);
 				break;
 			case ATTRIBUTE_RANGE :
-				executeAttributeRangeValidation(run, queryService, precoordinatedTypes);
+				executeAttributeRangeValidation(run, queryService, precoordinatedTypes, modules);
 				break;
 			case ATTRIBUTE_CARDINALITY :
-				executeAttributeCardinalityValidation(run, queryService, precoordinatedTypes);
+				executeAttributeCardinalityValidation(run, queryService, precoordinatedTypes, modules);
 				break;
 			case ATTRIBUTE_GROUP_CARDINALITY :
-				executeAttributeGroupCardinalityValidation(run, queryService, precoordinatedTypes);
+				executeAttributeGroupCardinalityValidation(run, queryService, precoordinatedTypes, modules);
 				break;
 			default :
 				LOGGER.error("ValidationType:" + type + " is not implemented yet!");
@@ -110,12 +109,12 @@ public class ValidationService {
 		}
 	}
 
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
-		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, MANDATORY);
-		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, OPTIONAL);
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
+		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, MANDATORY, modules);
+		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, OPTIONAL, modules);
 	}
 
-	private void executeAttributeGroupCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
+	private void executeAttributeGroupCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
@@ -139,7 +138,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, null);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, null, modules);
 				} else {
 					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_GROUP_CARDINALITY.getName() + " Skipped reason: ";
 					if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeIngroupCardinality())) {
@@ -155,36 +154,53 @@ public class ValidationService {
 	}
 
 	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
-			List<Long> invalidIds, ValidationType type, String domainConstraint) throws ServiceException {
+										  List <Long> invalidIds, ValidationType type, String domainConstraint, Set <String> modules) throws ServiceException {
 		String msg = "";
+		List <Long> newInvalidIds = new ArrayList<>();
 		if (run.getReleaseDate() != null) {
 			//Filter out failures for current release and previous published release.
 			List<Long> currentRelease = new ArrayList<>();
 			for (Long conceptId : invalidIds) {
 				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
+				if (!modules.isEmpty() && !modules.contains(result.getModuleId())) {
+					continue;
+				}
+				newInvalidIds.add(conceptId);
 				if (run.getReleaseDate().equals(result.getEffectiveTime())) {
 					currentRelease.add(conceptId);
 				} 
 			}
-			if (invalidIds.size() > currentRelease.size()) {
-				msg += " Total failures=" + invalidIds.size() + ". Failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
+			if (newInvalidIds.size() > currentRelease.size()) {
+				msg += " Total failures=" + newInvalidIds.size() + ". Failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
 			}
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				run.addCompletedAssertion(constructAssertion(attribute, type, msg, currentRelease, null, domainConstraint));
 			} else {
-				invalidIds.removeAll(currentRelease);
-				run.addCompletedAssertion(constructAssertion(attribute, type, msg, currentRelease, invalidIds, domainConstraint));
+				newInvalidIds.removeAll(currentRelease);
+				run.addCompletedAssertion(constructAssertion(attribute, type, msg, currentRelease, newInvalidIds, domainConstraint));
 			}
 		} else {
 			// for ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT display message that no effect date is supplied
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				msg += " Content type is for new concept only but there is no current release date specified.";
-			} 
-			run.addCompletedAssertion(constructAssertion(attribute, type, msg, invalidIds, null, domainConstraint));
+			}
+			if (!modules.isEmpty()) {
+				for (Long conceptId : invalidIds) {
+					ConceptResult result = queryService.retrieveConcept(conceptId.toString());
+				 	if (!modules.contains(result.getModuleId())) {
+						continue;
+					}
+					newInvalidIds.add(conceptId);
+				}
+			} else {
+				newInvalidIds = invalidIds;
+			}
+
+			run.addCompletedAssertion(constructAssertion(attribute, type, msg, newInvalidIds, null, domainConstraint));
 		}
 	}
 
-	private void executeAttributeCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
+	private void executeAttributeCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
@@ -210,7 +226,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY, null);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY, null, modules);
 				} 
 			}
 		}
@@ -231,16 +247,15 @@ public class ValidationService {
 		return assertion;
 		
 	}
-	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
+	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
 		Set<String> validationCompleted = new HashSet<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
-			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes,validationCompleted);
+			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes,validationCompleted, modules);
 		}
 	}
 
 	/**
 	 * @param precoordinatedTypes 
-	 * @param domain
 	 * VALIDATE: The domain of a given attribute
 	 * RETURNS: Incorrect relationships
 	 *  APPLIES TO: Each attribute <ATTRIBUTE_ID> (which may have one or more domains)
@@ -254,7 +269,7 @@ public class ValidationService {
 	 * @throws ServiceException *
 	 * 
 	*/
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh) throws ServiceException {
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh, Set <String> modules) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, List<Attribute>> attributesById = new HashMap<>();
 		filterAttributeDomainByStrength(run, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
@@ -275,7 +290,7 @@ public class ValidationService {
 			}
 			
 			for (Attribute attribute : attributesById.get(attributeId)) {
-				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
+				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString(), modules);
 			}
 		}
 	}
@@ -389,7 +404,7 @@ public class ValidationService {
 		return false;
 	}
 
-	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
+	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
 				LOGGER.error("No range constraint found for attribute {} domain {}.", attribute.getAttributeId(),domain.getDomainId());
@@ -432,7 +447,7 @@ public class ValidationService {
 						conceptIdsWithInvalidAttributeValue.addAll(conceptsWithAnyAttributeValue);
 						conceptIdsWithInvalidAttributeValue.removeAll(conceptsWithAttributeValueWithinRange);
 					} 
-					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null);
+					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null, modules);
 				} else {
 					run.addSkippedAssertion(constructAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
 				}
