@@ -3,7 +3,9 @@ package org.snomed.quality.validator.mrcm;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 
 public class Assertion {
@@ -24,7 +26,9 @@ public class Assertion {
 	private final UUID uuid;
 	private Attribute attribute;
 	private List<Long> currentViolatedConceptIds;
+	private List<ConceptResult> currentViolatedConcepts;
 	private List<Long> previousViolatedConceptIds;
+	private List<ConceptResult> previousViolatedConcepts;
 	private final String message;
 	private ValidationType validationType;
 	private FailureType failureType;
@@ -49,10 +53,20 @@ public class Assertion {
 	}
 		
 	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType,
-			List<Long> currentViolatedConceptIds, List<Long> previousViolatedConceptIds, String domainConstraint) {
-		this(attribute, type, msg, failureType, currentViolatedConceptIds);
-		this.previousViolatedConceptIds = previousViolatedConceptIds == null ? new ArrayList<>() : previousViolatedConceptIds;
+					  List<ConceptResult> currentViolatedConcepts, List<ConceptResult> previousViolatedConcepts, String domainConstraint) {
+		this(attribute, type, msg, failureType, currentViolatedConcepts == null ? new ArrayList<>() : currentViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList()));
+		this.previousViolatedConceptIds = previousViolatedConcepts == null ? new ArrayList<>() : previousViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList());
 		this.domainConstraint = domainConstraint;
+		this.currentViolatedConcepts = currentViolatedConcepts;
+		this.previousViolatedConcepts = previousViolatedConcepts == null ? new ArrayList<>() : previousViolatedConcepts;
+	}
+
+	public List<ConceptResult> getCurrentViolatedConcepts() {
+		return currentViolatedConcepts;
+	}
+
+	public List<ConceptResult> getPreviousViolatedConcepts() {
+		return previousViolatedConcepts;
 	}
 
 	public List<Long> getPreviousViolatedConceptIds() {
@@ -85,8 +99,9 @@ public class Assertion {
 	}
 	
 	public String getAssertionText() {
-		String assertionText = String.format("MRCM rule must be applied to attribute:%s for content type:%s within %s constraint:", 
-				attribute.getAttributeId(), attribute.getContentTypeId(), validationType.getName().toLowerCase());
+		String assertionText = String.format("The attribute value of %s must conform to the MRCM %s",
+				attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+				validationType.getName().toLowerCase());
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
@@ -97,6 +112,23 @@ public class Assertion {
 			assertionText +=  domainConstraint != null ? domainConstraint : " ";
 		}
 		return assertionText;
+	}
+
+	public String getDetails() {
+		String detail = String.format("Attribute %s has value of %s which is not  conformed to the MRCM %s",
+				attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+				attribute.getContentTypeId() + (attribute.getContentTypeFsn() == null ? "" : " |" + attribute.getContentTypeFsn() + "|"),
+				validationType.getName().toLowerCase());
+		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
+			detail += " [" + attribute.getAttributeCardinality() + "]";
+		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
+			detail += " [" + attribute.getAttributeIngroupCardinality() + "]";
+		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
+			detail += " " + attribute.getRangeConstraint();
+		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
+			detail +=  domainConstraint != null ? domainConstraint : " ";
+		}
+		return detail;
 	}
 	
 	public FailureType getFailureType() {

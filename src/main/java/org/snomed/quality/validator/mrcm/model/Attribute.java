@@ -6,7 +6,9 @@ public class Attribute {
 	public static enum Type {DOMAIN,RANGE};
 	private UUID uuid;
 	private final String attributeId;
+	private String attributeFsn;
 	private final String contentTypeId;
+	private String contentTypeFsn;
 	private String rangeConstraint;
 	private boolean isGrouped;
 	private String attributeCardinality;
@@ -14,7 +16,6 @@ public class Attribute {
 	private String ruleStrengthId;
 	private Type type;
 
-	
 	public UUID getUuid() {
 		return uuid;
 	}
@@ -34,6 +35,22 @@ public class Attribute {
 
 	public String getContentTypeId() {
 		return contentTypeId;
+	}
+
+	public void setAttributeFsn(String attributeFsn) {
+		this.attributeFsn = attributeFsn;
+	}
+
+	public void setContentTypeFsn(String contentTypeFsn) {
+		this.contentTypeFsn = contentTypeFsn;
+	}
+
+	public String getAttributeFsn() {
+		return attributeFsn;
+	}
+
+	public String getContentTypeFsn() {
+		return contentTypeFsn;
 	}
 
 	public String getRangeConstraint() {

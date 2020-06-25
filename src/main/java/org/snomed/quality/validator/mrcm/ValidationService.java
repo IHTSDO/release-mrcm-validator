@@ -119,7 +119,7 @@ public class ValidationService {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
 					//skip
-					run.addSkippedAssertion(constructAssertion(attribute, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
+					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
 					continue;
 				}
 				String domainPartEcl = "<<" + domain.getDomainId() + ":"; 
@@ -146,7 +146,7 @@ public class ValidationService {
 					} else if (!attribute.isGrouped()) {
 						skipMsg += " Attribute constraint is not grouped.";
 					}
-					run.addSkippedAssertion(constructAssertion(attribute,ValidationType.ATTRIBUTE_GROUP_CARDINALITY, skipMsg));
+					run.addSkippedAssertion(constructAssertion(queryService, attribute,ValidationType.ATTRIBUTE_GROUP_CARDINALITY, skipMsg));
 				}
 			}
 		}
@@ -156,47 +156,43 @@ public class ValidationService {
 	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
 										  List <Long> invalidIds, ValidationType type, String domainConstraint, Set <String> modules) throws ServiceException {
 		String msg = "";
-		List <Long> newInvalidIds = new ArrayList<>();
+		List <ConceptResult> newInvalidConcepts = new ArrayList<>();
 		if (run.getReleaseDate() != null) {
 			//Filter out failures for current release and previous published release.
-			List<Long> currentRelease = new ArrayList<>();
+			List<ConceptResult> currentRelease = new ArrayList<>();
 			for (Long conceptId : invalidIds) {
 				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
 				if (!modules.isEmpty() && !modules.contains(result.getModuleId())) {
 					continue;
 				}
-				newInvalidIds.add(conceptId);
+				newInvalidConcepts.add(result);
 				if (run.getReleaseDate().equals(result.getEffectiveTime())) {
-					currentRelease.add(conceptId);
+					currentRelease.add(result);
 				} 
 			}
-			if (newInvalidIds.size() > currentRelease.size()) {
-				msg += " Total failures=" + newInvalidIds.size() + ". Failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
+			if (newInvalidConcepts.size() > currentRelease.size()) {
+				msg += " Total failures=" + newInvalidConcepts.size() + ". Failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
 			}
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
-				run.addCompletedAssertion(constructAssertion(attribute, type, msg, currentRelease, null, domainConstraint));
+				run.addCompletedAssertion(constructAssertion(queryService, attribute, type, msg, currentRelease, null, domainConstraint));
 			} else {
-				newInvalidIds.removeAll(currentRelease);
-				run.addCompletedAssertion(constructAssertion(attribute, type, msg, currentRelease, newInvalidIds, domainConstraint));
+				newInvalidConcepts.removeAll(currentRelease);
+				run.addCompletedAssertion(constructAssertion(queryService, attribute, type, msg, currentRelease, newInvalidConcepts, domainConstraint));
 			}
 		} else {
 			// for ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT display message that no effect date is supplied
 			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				msg += " Content type is for new concept only but there is no current release date specified.";
 			}
-			if (!modules.isEmpty()) {
-				for (Long conceptId : invalidIds) {
-					ConceptResult result = queryService.retrieveConcept(conceptId.toString());
-				 	if (!modules.contains(result.getModuleId())) {
-						continue;
-					}
-					newInvalidIds.add(conceptId);
+			for (Long conceptId : invalidIds) {
+				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
+				if (!modules.isEmpty() &&  !modules.contains(result.getModuleId())) {
+					continue;
 				}
-			} else {
-				newInvalidIds = invalidIds;
+				newInvalidConcepts.add(result);
 			}
 
-			run.addCompletedAssertion(constructAssertion(attribute, type, msg, newInvalidIds, null, domainConstraint));
+			run.addCompletedAssertion(constructAssertion(queryService, attribute, type, msg, newInvalidConcepts, null, domainConstraint));
 		}
 	}
 
@@ -205,13 +201,13 @@ public class ValidationService {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
 					//skip
-					run.addSkippedAssertion(constructAssertion(attribute, ValidationType.ATTRIBUTE_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
+					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
 					continue;
 				}
 				String domainPartEcl = domain.getDomainId() + ":"; 
 				String attributePartEcl = "<<" + attribute.getAttributeId() + "=*";
 				if ( NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
-					run.addSkippedAssertion(constructAssertion(attribute, ValidationType.ATTRIBUTE_CARDINALITY, 
+					run.addSkippedAssertion(constructAssertion(queryService,attribute, ValidationType.ATTRIBUTE_CARDINALITY,
 							"Attribute cardinality constraint is " + attribute.getAttributeCardinality()));
 				} else {
 					String eclWithoutCardinality = domainPartEcl +  attributePartEcl;
@@ -232,18 +228,25 @@ public class ValidationService {
 		}
 	}
 
-	private Assertion constructAssertion(Attribute attribute, ValidationType attributeCardinality, String skipMsg) {
-		return constructAssertion(attribute, attributeCardinality, skipMsg, null,null,null);
+	private Assertion constructAssertion(SnomedQueryService queryService,Attribute attribute, ValidationType attributeCardinality, String skipMsg) {
+		return constructAssertion(queryService, attribute, attributeCardinality, skipMsg, null,null,null);
 	}
 
-	private Assertion constructAssertion(Attribute attribute, ValidationType validationType, String msg, 
-			List<Long> currentInvalidIds,  List<Long> previousInvalid, String domainConstraint) {
+	private Assertion constructAssertion(SnomedQueryService queryService, Attribute attribute, ValidationType validationType, String msg,
+			List<ConceptResult> currentInvalidConcepts,  List<ConceptResult> previousInvalidConcepts, String domainConstraint) {
 		FailureType failureType = FailureType.ERROR;
 		if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
 			failureType = FailureType.WARNING;
 		}
+		try {
+			attribute.setAttributeFsn(queryService.retrieveConcept(attribute.getAttributeId()).getFsn());
+			attribute.setContentTypeFsn(queryService.retrieveConcept(attribute.getContentTypeId()).getFsn());
+		} catch (ServiceException e) {
+			LOGGER.error("Error while retrieving concept details for Attribute  '{}' and Content Type '{}'", attribute.getAttributeId(), attribute.getContentTypeId());
+		}
+
 		Assertion assertion = new Assertion(attribute, validationType,
-				msg, failureType, currentInvalidIds, previousInvalid, domainConstraint);
+				msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
 		return assertion;
 		
 	}
@@ -272,7 +275,7 @@ public class ValidationService {
 	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh, Set <String> modules) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, List<Attribute>> attributesById = new HashMap<>();
-		filterAttributeDomainByStrength(run, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
+		filterAttributeDomainByStrength(run, queryService, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
 		
 		for (String attributeId : attributeDomainMap.keySet()) {
 			List<Domain> domains = attributeDomainMap.get(attributeId);
@@ -363,8 +366,8 @@ public class ValidationService {
 		return violatedConcepts;
 	}
 
-	private void filterAttributeDomainByStrength(ValidationRun run, List<Long> precoordinatedTypes, String ruleStrengh,
-			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) {
+	private void filterAttributeDomainByStrength(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh,
+			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				//There are cases that domain rule is optional e.g 723264001 for Laterality attribute
@@ -387,7 +390,7 @@ public class ValidationService {
 						attributeDomainMap.put(attribute.getAttributeId(), domainList);
 					}
 				} else {
-					run.addSkippedAssertion(constructAssertion(attribute, ValidationType.ATTRIBUTE_DOMAIN,
+					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_DOMAIN,
 							" is skipped due to the content type is out of scope:" + attribute.getContentTypeId()));
 				}
 			}
@@ -449,7 +452,7 @@ public class ValidationService {
 					} 
 					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null, modules);
 				} else {
-					run.addSkippedAssertion(constructAssertion(attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
+					run.addSkippedAssertion(constructAssertion(queryService, attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
 				}
 			}
 		}
