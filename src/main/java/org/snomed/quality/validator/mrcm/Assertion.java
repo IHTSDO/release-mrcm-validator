@@ -115,14 +115,19 @@ public class Assertion {
 	}
 
 	public String getDetails() {
-		String detail = String.format("Attribute %s has value of %s which is not  conformed to the MRCM %s",
+		String detail = String.format("Attribute %s has value which is not conformed to the MRCM %s",
 				attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
-				attribute.getContentTypeId() + (attribute.getContentTypeFsn() == null ? "" : " |" + attribute.getContentTypeFsn() + "|"),
 				validationType.getName().toLowerCase());
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
-			detail += " [" + attribute.getAttributeCardinality() + "]";
+			detail = String.format("The MRCM attribute cardinality is [%s] for %s but found %s",
+					attribute.getAttributeCardinality(),
+					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+					getFailureCardinalityMessage(attribute.getAttributeCardinality()));
 		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
-			detail += " [" + attribute.getAttributeIngroupCardinality() + "]";
+			detail = String.format("The MRCM attribute group cardinality is [%s] for %s but found %s",
+					attribute.getAttributeIngroupCardinality(),
+					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+					getFailureCardinalityMessage(attribute.getAttributeIngroupCardinality()));
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			detail += " " + attribute.getRangeConstraint();
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
@@ -130,7 +135,36 @@ public class Assertion {
 		}
 		return detail;
 	}
-	
+
+	private String getFailureCardinalityMessage(String cardinality) {
+		char minCardinality = getMinCaridinality(cardinality);
+		char maxCardinality = getMaxCaridinality(cardinality);
+
+		if (minCardinality == '0') {
+			if (maxCardinality != '*' && Character.getNumericValue(maxCardinality) > Character.getNumericValue(minCardinality)) {
+				return "more than " + maxCardinality;
+			}
+		}
+		else {
+			if (maxCardinality == '*') {
+				return "less than " + minCardinality;
+			} else if (minCardinality == maxCardinality) {
+				return  "more than " + minCardinality + " or don't have " + minCardinality + " at all";
+			} else if (Character.getNumericValue(maxCardinality) > Character.getNumericValue(minCardinality)) {
+				return "less than " + minCardinality + " or more than " + maxCardinality;
+			}
+		}
+		return  "";
+	}
+
+	private char getMinCaridinality(String cardinality) {
+		return cardinality.charAt(0);
+	}
+
+	private char getMaxCaridinality(String cardinality) {
+		return cardinality.charAt(cardinality.length() - 1);
+	}
+
 	public FailureType getFailureType() {
 		return this.failureType;
 	}

@@ -8,7 +8,6 @@ public class Attribute {
 	private final String attributeId;
 	private String attributeFsn;
 	private final String contentTypeId;
-	private String contentTypeFsn;
 	private String rangeConstraint;
 	private boolean isGrouped;
 	private String attributeCardinality;
@@ -41,16 +40,8 @@ public class Attribute {
 		this.attributeFsn = attributeFsn;
 	}
 
-	public void setContentTypeFsn(String contentTypeFsn) {
-		this.contentTypeFsn = contentTypeFsn;
-	}
-
-	public String getAttributeFsn() {
+	public String  getAttributeFsn() {
 		return attributeFsn;
-	}
-
-	public String getContentTypeFsn() {
-		return contentTypeFsn;
 	}
 
 	public String getRangeConstraint() {

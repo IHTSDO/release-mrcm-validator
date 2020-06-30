@@ -240,7 +240,6 @@ public class ValidationService {
 		}
 		try {
 			attribute.setAttributeFsn(queryService.retrieveConcept(attribute.getAttributeId()).getFsn());
-			attribute.setContentTypeFsn(queryService.retrieveConcept(attribute.getContentTypeId()).getFsn());
 		} catch (ServiceException e) {
 			LOGGER.error("Error while retrieving concept details for Attribute  '{}' and Content Type '{}'", attribute.getAttributeId(), attribute.getContentTypeId());
 		}
