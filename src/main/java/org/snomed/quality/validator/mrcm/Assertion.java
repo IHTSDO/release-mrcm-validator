@@ -105,7 +105,7 @@ public class Assertion {
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
-			assertionText += " [" + attribute.getAttributeIngroupCardinality() + "]";
+			assertionText += " [" + attribute.getAttributeInGroupCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			assertionText += " " + attribute.getRangeConstraint();
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
@@ -125,9 +125,9 @@ public class Assertion {
 					getFailureCardinalityMessage(attribute.getAttributeCardinality()));
 		} else if (ValidationType.ATTRIBUTE_GROUP_CARDINALITY == validationType) {
 			detail = String.format("The MRCM attribute group cardinality is [%s] for %s but found %s",
-					attribute.getAttributeIngroupCardinality(),
+					attribute.getAttributeInGroupCardinality(),
 					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
-					getFailureCardinalityMessage(attribute.getAttributeIngroupCardinality()));
+					getFailureCardinalityMessage(attribute.getAttributeInGroupCardinality()));
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			detail += " " + attribute.getRangeConstraint();
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {

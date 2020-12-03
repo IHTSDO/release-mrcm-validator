@@ -30,6 +30,8 @@ import org.springframework.util.Assert;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.lang.Long.parseLong;
 
@@ -52,7 +54,6 @@ public class ValidationService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
 
 	private Set<Long> ungroupedAttributes = new HashSet<>();
-	
 
 	public void loadMRCM(File sourceDirectory, ValidationRun run) throws ReleaseImportException {
 		MRCMFactory mrcmFactory = new MRCMFactory();
@@ -70,21 +71,22 @@ public class ValidationService {
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
-		executeValidation(releaseDirectory, run, Collections.EMPTY_SET);
+		executeValidation(releaseDirectory, run, Collections.emptySet());
 	}
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
 		LoadingProfile profile = run.isStatedView() ?
-				LoadingProfile.light.withFullRelationshipObjects().withStatedRelationships()
+				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
 				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
-				: LoadingProfile.light.withFullRelationshipObjects().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()
+				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
-        OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore());
+		OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore());
 		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionFactory);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
 
 		//checking data is loaded properly
-		LOGGER.info("Total concepts loaded:" + queryService.getConceptCount());
+		LOGGER.info("Total concepts loaded {}", queryService.getConceptCount());
 		
 		List<Long> precoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT, 0, 100).getConceptIds();
 		Assert.notEmpty(precoordinatedTypes, "Concept " + ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT + " and descendants must be accessible.");
@@ -123,14 +125,13 @@ public class ValidationService {
 					continue;
 				}
 				String domainPartEcl = "<<" + domain.getDomainId() + ":"; 
-				//				String domainPartEcl = "*" + ":"; 
-				String attributePartEcl = "<<" + attribute.getAttributeId() + "=*";
-				if (attribute.isGrouped() && !NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeIngroupCardinality())) {
+				String attributePartEcl = attribute.getAttributeId() + "=*";
+				if (attribute.isGrouped() && !NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeInGroupCardinality())) {
 					String eclWithoutCardinality = domainPartEcl + "[0..*]" + " { [0..*] " + attributePartEcl + " }";
 					//run ECL query to retrieve failures
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without group cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
 					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
-					String eclWithCardinality = domainPartEcl + "[" + attribute.getAttributeCardinality() + "]" + "{ [" + attribute.getAttributeIngroupCardinality() + "] " + attributePartEcl + "}";
+					String eclWithCardinality = domainPartEcl + "[" + attribute.getAttributeCardinality() + "]" + "{ [" + attribute.getAttributeInGroupCardinality() + "] " + attributePartEcl + "}";
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
 					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
 					List<Long> invalidIds = new ArrayList<>();
@@ -141,8 +142,8 @@ public class ValidationService {
 					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, null, modules);
 				} else {
 					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_GROUP_CARDINALITY.getName() + " Skipped reason: ";
-					if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeIngroupCardinality())) {
-						skipMsg += " Attribute group cardinality constraint is " + attribute.getAttributeIngroupCardinality();
+					if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeInGroupCardinality())) {
+						skipMsg += " Attribute group cardinality constraint is " + attribute.getAttributeInGroupCardinality();
 					} else if (!attribute.isGrouped()) {
 						skipMsg += " Attribute constraint is not grouped.";
 					}
@@ -204,17 +205,17 @@ public class ValidationService {
 					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
 					continue;
 				}
-				String domainPartEcl = domain.getDomainId() + ":"; 
-				String attributePartEcl = "<<" + attribute.getAttributeId() + "=*";
 				if ( NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
 					run.addSkippedAssertion(constructAssertion(queryService,attribute, ValidationType.ATTRIBUTE_CARDINALITY,
 							"Attribute cardinality constraint is " + attribute.getAttributeCardinality()));
 				} else {
-					String eclWithoutCardinality = domainPartEcl +  attributePartEcl;
+					String domainConstraint = domain.getDomainConstraint() + " : ";
+					String attributeWithoutRange = attribute.getAttributeId() + " =* ";
+					String eclWithoutCardinality = domainConstraint +  attributeWithoutRange;
 					//run ECL query to retrieve failures
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
 					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
-					String eclWithCardinality = domainPartEcl + " [" + attribute.getAttributeCardinality() + "] " + attributePartEcl;
+					String eclWithCardinality = domainConstraint + " [" + attribute.getAttributeCardinality() + "] " + attributeWithoutRange;
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
 					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
 					List<Long> invalidIds = new ArrayList<>();
@@ -228,12 +229,12 @@ public class ValidationService {
 		}
 	}
 
-	private Assertion constructAssertion(SnomedQueryService queryService,Attribute attribute, ValidationType attributeCardinality, String skipMsg) {
+	private Assertion constructAssertion(SnomedQueryService queryService, Attribute attribute, ValidationType attributeCardinality, String skipMsg) {
 		return constructAssertion(queryService, attribute, attributeCardinality, skipMsg, null,null,null);
 	}
 
 	private Assertion constructAssertion(SnomedQueryService queryService, Attribute attribute, ValidationType validationType, String msg,
-			List<ConceptResult> currentInvalidConcepts,  List<ConceptResult> previousInvalidConcepts, String domainConstraint) {
+			List<ConceptResult> currentInvalidConcepts, List<ConceptResult> previousInvalidConcepts, String domainConstraint) {
 		FailureType failureType = FailureType.ERROR;
 		if (!MANDATORY.equals(attribute.getRuleStrengthId())) {
 			failureType = FailureType.WARNING;
@@ -241,13 +242,9 @@ public class ValidationService {
 		try {
 			attribute.setAttributeFsn(queryService.retrieveConcept(attribute.getAttributeId()).getFsn());
 		} catch (ServiceException e) {
-			LOGGER.error("Error while retrieving concept details for Attribute  '{}' and Content Type '{}'", attribute.getAttributeId(), attribute.getContentTypeId());
+			LOGGER.error("Error while retrieving concept details for attribute '{}' and Content Type '{}'", attribute.getAttributeId(), attribute.getContentTypeId());
 		}
-
-		Assertion assertion = new Assertion(attribute, validationType,
-				msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
-		return assertion;
-		
+		return new Assertion(attribute, validationType, msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
 	}
 	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
 		Set<String> validationCompleted = new HashSet<>();
@@ -264,8 +261,8 @@ public class ValidationService {
 	 *             and rule strength = Mandatory and content type in {|All SNOMED CT content|, |All precoordinated content|}
 	 *  EXAMPLE: Finding site domain = 363698007 |Clinical finding|
 	 *  
-	 *  ECL: (*:<<272741003=*) MINUS (<<91723000 OR <<723264001)
-	 *  ECL: (*:<<272741003=*) MINUS <<91723000
+	 *  ECL: (*:272741003=*) MINUS (<<91723000 OR <<723264001)
+	 *  ECL: (*:272741003=*) MINUS <<91723000
 	 *  
 	 *  << ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|
 	 * @throws ServiceException *
@@ -279,7 +276,7 @@ public class ValidationService {
 		for (String attributeId : attributeDomainMap.keySet()) {
 			List<Domain> domains = attributeDomainMap.get(attributeId);
 			if (domains.isEmpty()) {
-				LOGGER.error("Attribute:" + attributeId + " has no domain.");
+				LOGGER.error("Attribute {} has no domain.", attributeId);
 				continue;
 			}
 			boolean nestedQueryFound = containNestedEclQuery(domains);
@@ -299,7 +296,7 @@ public class ValidationService {
 
 	private List<Long> processNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId, List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
 		 List<Long> violatedConcepts = new ArrayList<>();
-		String withAttributeQuery = "*:<< " + attributeId + "=*";
+		String withAttributeQuery = "*:" + attributeId + "=*";
 		List<Long> conceptsWithAttribute = queryService.eclQueryReturnConceptIdentifiers(withAttributeQuery, 0, -1).getConceptIds();
 		List<Long> result = new ArrayList<>();
 		for (Domain domain : domains) {
@@ -343,7 +340,7 @@ public class ValidationService {
 	private List<Long> processNonNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId,
 			List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
 		List<Long> violatedConcepts;
-		String withAttributeButWrongDomainEcl = "(*:<<" + attributeId + "=*) MINUS ";
+		String withAttributeButWrongDomainEcl = "(*:" + attributeId + "=*) MINUS ";
 		if (domains.size() > 1) {
 			withAttributeButWrongDomainEcl += "(";
 		}
@@ -409,7 +406,7 @@ public class ValidationService {
 	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
-				LOGGER.error("No range constraint found for attribute {} domain {}.", attribute.getAttributeId(),domain.getDomainId());
+				LOGGER.error("No range constraint found with attribute id {} for domain {}.", attribute.getAttributeId(), domain.getDomainId());
 				continue;
 			}
 			for (Attribute attributeRange : domain.getAttributeRanges(attribute.getAttributeId())) {
@@ -431,17 +428,15 @@ public class ValidationService {
 				if (precoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
 					String baseEcl = domainConstraint;
 					baseEcl += baseEcl.contains(":") ? ", " : ": ";
-					baseEcl += attributeId + " = ";
-					String matchAllAttributeValues = baseEcl + "*";
-					String matchAttributeValuesWithinRange = containsMultipleSCTIDs(rangeConstraint)
-							? baseEcl + "(" + rangeConstraint + ")"
-									: baseEcl + rangeConstraint;
+					baseEcl += attributeId;
+					String matchAllAttributeValues = baseEcl + " = *";
+					String matchRangeRule = removeCardinality(attributeRange.getRangeRule());
 					// All concepts
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domainConstraint, attributeId, matchAllAttributeValues);
 					List<Long> conceptsWithAnyAttributeValue = queryService.eclQueryReturnConceptIdentifiers(matchAllAttributeValues, 0, -1).getConceptIds();
 
-					LOGGER.info("Selecting content within domain '{}' with attribute '{}' within range constraint using expression '{}'", domainConstraint, attributeId, matchAttributeValuesWithinRange);
-					List<Long> conceptsWithAttributeValueWithinRange = queryService.eclQueryReturnConceptIdentifiers(matchAttributeValuesWithinRange, 0, -1).getConceptIds();
+					LOGGER.info("Selecting content within domain '{}' with attribute '{}' within range constraint using expression '{}'", domainConstraint, attributeId, matchRangeRule);
+					List<Long> conceptsWithAttributeValueWithinRange = queryService.eclQueryReturnConceptIdentifiers(matchRangeRule, 0, -1).getConceptIds();
 
 					List<Long> conceptIdsWithInvalidAttributeValue = new ArrayList<>();
 					if (conceptsWithAnyAttributeValue.size() > conceptsWithAttributeValueWithinRange.size()) {
@@ -456,9 +451,26 @@ public class ValidationService {
 			}
 		}
 	}
-	
-	private boolean containsMultipleSCTIDs(String expression) {
-		return expression.matches(".*(\\d){6,18}[^\\d]*(\\d){6,18}.*");
+
+	private String removeCardinality(String rangeRule) {
+		Pattern cardinalityPattern = Pattern.compile("(.*)(\\[.*\\.\\..*\\])(.*)");
+		String[] splits = rangeRule.split("\\s+");
+		StringBuilder builder = new StringBuilder();
+		for (String split : splits) {
+			Matcher matcher = cardinalityPattern.matcher(split);
+			if (matcher.matches()) {
+				if (!matcher.group(1).isEmpty()) {
+					builder.append(matcher.group(1));
+				}
+				if (!matcher.group(3).isEmpty()) {
+					builder.append(matcher.group(3));
+				}
+			} else {
+				builder.append(split);
+				builder.append(" ");
+			}
+		}
+		return builder.toString();
 	}
 
 	private class MRCMFactory extends ImpotentComponentFactory {
@@ -467,6 +479,7 @@ public class ValidationService {
 		private static final int proximalPrimitiveConstraint = 2;
 		private static final int attDomainIdIndex = 0;
 		private static final int ranRangeConstraintIndex = 0;
+		private static final int rangeRuleIndex = 1;
 		private static final int ranContentTypeIndex = 3;
 		public static final int attContentTypeIndex = 5;
 
@@ -541,7 +554,7 @@ public class ValidationService {
 			}
 			attribute.setGrouped(otherValues[1]);
 			attribute.setAttributeCardinality(otherValues[2]);
-			attribute.setAttributeIngroupCardinality(otherValues[3]);
+			attribute.setAttributeInGroupCardinality(otherValues[3]);
 			attribute.setRuleStrengthId(otherValues[4]);
 			attribute.setType(Attribute.Type.DOMAIN);
 			return attribute;
@@ -553,6 +566,7 @@ public class ValidationService {
 				attribute.setUuid(UUID.fromString(uuid));
 			}
 			attribute.setRangeConstraint(otherValues[ranRangeConstraintIndex]);
+			attribute.setRangeRule(otherValues[rangeRuleIndex]);
 			attribute.setRuleStrengthId(otherValues[2]);
 			attribute.setType(Type.RANGE);
 			if (attributeRangeMap.containsKey(attribute.getAttributeId())) {
@@ -599,16 +613,13 @@ public class ValidationService {
 					// Fields: id	effectiveTime	active	moduleId	refsetId	referencedComponentId	owlExpression
 					String owlExpression = otherValues[0];
 					try {
-						//AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(parseLong(referencedComponentId), owlExpression);
 						AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(owlExpression);
 						if (axiom != null) {
 							if (axiom.getLeftHandSideNamedConcept() != null && axiom.getRightHandSideRelationships() != null) {
 								// Regular axiom
 								addRelationships(id, axiom.getLeftHandSideNamedConcept(), axiom.getRightHandSideRelationships(), moduleId, effectiveTime);
 							} else if (axiom.getRightHandSideNamedConcept() != null && axiom.getLeftHandSideRelationships() != null) {
-								// GCI OntologyAxiom
-                                // Skip GCI Axioms
-								//addRelationships(id,  axiom.getRightHandSideNamedConcept(), axiom.getLeftHandSideRelationships(), moduleId, effectiveTime);
+								// skip GCI axioms
 								logger.info("GCI axiom id {}", id);
 							}
 						}
@@ -637,28 +648,27 @@ public class ValidationService {
 			}));
 		}
 
-        private ComponentStore getComponentStore() {
-            return this.componentStore;
-        }
-
+		private ComponentStore getComponentStore() {
+			return this.componentStore;
+		}
 	}
 
 	private class MRCMValidatorReleaseImportManager extends ReleaseImportManager {
 
-        private ReleaseImporter releaseImporter;
+		private ReleaseImporter releaseImporter;
 
-        public MRCMValidatorReleaseImportManager() {
-            releaseImporter = new ReleaseImporter();
-        }
+		public MRCMValidatorReleaseImportManager() {
+			releaseImporter = new ReleaseImporter();
+		}
 
-        public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
-            return loadReleaseFiledToStore(releaseDirectory, loadingProfile, new RamReleaseStore(), componentFactory);
-        }
+		public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+			return loadReleaseFiledToStore(releaseDirectory, loadingProfile, new RamReleaseStore(), componentFactory);
+		}
 
-        private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
-            releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory);
-            final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
-            return writeToIndex(conceptMap, releaseStore, loadingProfile);
-        }
-    }
+		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+			releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory);
+			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
+			return writeToIndex(conceptMap, releaseStore, loadingProfile);
+		}
+	}
 }

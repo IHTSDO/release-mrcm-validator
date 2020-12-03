@@ -3,16 +3,28 @@ package org.snomed.quality.validator.mrcm.model;
 import java.util.UUID;
 
 public class Attribute {
-	public static enum Type {DOMAIN,RANGE};
+	public static enum Type {DOMAIN, RANGE};
+
 	private UUID uuid;
+
 	private final String attributeId;
+
 	private String attributeFsn;
+
 	private final String contentTypeId;
+
 	private String rangeConstraint;
+
+	private String rangeRule;
+
 	private boolean isGrouped;
+
 	private String attributeCardinality;
-	private String attributeIngroupCardinality;
+
+	private String attributeInGroupCardinality;
+
 	private String ruleStrengthId;
+
 	private Type type;
 
 	public UUID getUuid() {
@@ -52,12 +64,20 @@ public class Attribute {
 		this.rangeConstraint = rangeConstraint;
 	}
 
+	public String getRangeRule() {
+		return rangeRule;
+	}
+
+	public void setRangeRule(String rangeRule) {
+		this.rangeRule = rangeRule;
+	}
+
 	public boolean isGrouped() {
 		return isGrouped;
 	}
 
-	public void setGrouped(String gruped) {
-		this.isGrouped = "1".equals(gruped) ? true:false;
+	public void setGrouped(String grouped) {
+		this.isGrouped = "1".equals(grouped) ? true:false;
 	}
 
 	public String getAttributeCardinality() {
@@ -68,12 +88,12 @@ public class Attribute {
 		this.attributeCardinality = attributeCardinality;
 	}
 
-	public String getAttributeIngroupCardinality() {
-		return attributeIngroupCardinality;
+	public String getAttributeInGroupCardinality() {
+		return attributeInGroupCardinality;
 	}
 
-	public void setAttributeIngroupCardinality(String attributeIngroupCardinality) {
-		this.attributeIngroupCardinality = attributeIngroupCardinality;
+	public void setAttributeInGroupCardinality(String attributeInGroupCardinality) {
+		this.attributeInGroupCardinality = attributeInGroupCardinality;
 	}
 
 	public void setType(Type type) {
@@ -103,7 +123,7 @@ public class Attribute {
 		int result = 1;
 		result = prime * result + ((attributeCardinality == null) ? 0 : attributeCardinality.hashCode());
 		result = prime * result + ((attributeId == null) ? 0 : attributeId.hashCode());
-		result = prime * result + ((attributeIngroupCardinality == null) ? 0 : attributeIngroupCardinality.hashCode());
+		result = prime * result + ((attributeInGroupCardinality == null) ? 0 : attributeInGroupCardinality.hashCode());
 		result = prime * result + ((contentTypeId == null) ? 0 : contentTypeId.hashCode());
 		result = prime * result + (isGrouped ? 1231 : 1237);
 		result = prime * result + ((rangeConstraint == null) ? 0 : rangeConstraint.hashCode());
@@ -131,10 +151,10 @@ public class Attribute {
 				return false;
 		} else if (!attributeId.equals(other.attributeId))
 			return false;
-		if (attributeIngroupCardinality == null) {
-			if (other.attributeIngroupCardinality != null)
+		if (attributeInGroupCardinality == null) {
+			if (other.attributeInGroupCardinality != null)
 				return false;
-		} else if (!attributeIngroupCardinality.equals(other.attributeIngroupCardinality))
+		} else if (!attributeInGroupCardinality.equals(other.attributeInGroupCardinality))
 			return false;
 		if (contentTypeId == null) {
 			if (other.contentTypeId != null)
@@ -161,6 +181,4 @@ public class Attribute {
 	public Type getType() {
 		return this.type;
 	}
-	
-	
 }

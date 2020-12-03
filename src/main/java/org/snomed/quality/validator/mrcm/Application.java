@@ -4,7 +4,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Set;
@@ -30,10 +29,10 @@ public class Application {
 		File resultDir = null;
 		boolean isStatedViewOnly = true;
 		if ( args == null || args.length < 4) {
-			String msg = "Please specifiy the java arguments after replacing the {} with actual values." + "{release_package_unzipped_root} {is_stated_only} {release_date} {result_dir}";
+			String msg = "Please specify the java arguments after replacing the {} with actual values." + "{release_package_unzipped_root} {is_stated_only} {release_date} {result_dir}";
 			System.out.println(msg);
-			System.out.println("{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/mchu/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
-			System.out.println("{is_stated_only} is to state whether to use stated relationships only. This parameter is optional and the default is set to true when not specified.");
+			System.out.println("{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
+			System.out.println("{is_stated_only} is to state whether to use stated relationships only. This parameter is optional and the default value is set to true.");
 			System.out.println("{release_date} is the effective date for the release file that is being validated.The format is yyyyMMdd eg:20170731");
 			System.out.println("{result_dir} is the directory where validation reports will be saved.");
 			throw new IllegalStateException(msg);
@@ -52,7 +51,7 @@ public class Application {
 		}
 	}
 
-	private void run(String releasePackage, String releaseDate, boolean isStatedViewOnly, File resultDir) throws ReleaseImportException, IOException, ServiceException, ParseException {
+	private void run(String releasePackage, String releaseDate, boolean isStatedViewOnly, File resultDir) throws ReleaseImportException, IOException, ServiceException {
 		ValidationService service = new ValidationService();
 		ValidationRun run = new ValidationRun(releaseDate, isStatedViewOnly);
 		if (releasePackage == null) {
@@ -83,7 +82,7 @@ public class Application {
 					writer.write(NEW_LINE);
 				}
 			}
-			System.out.println("Please see completed successfull validations report in " + successReport.getAbsolutePath());
+			System.out.println("Please see completed successful validations report in " + successReport.getAbsolutePath());
 		}
 	}
 
@@ -103,7 +102,7 @@ public class Application {
 
 	private void createValidationFailureReport(File resultDir, Set<Assertion> failures, boolean isErrorReporting) throws IOException {
 		String type = isErrorReporting ? "WithError" : "WithWarning";
-		File report = new File(resultDir,"MrcmValidationReport" + type + ".txt");
+		File report = new File(resultDir,"MRCMValidationReport" + type + ".txt");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
 			String reportHeader = "Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Current Release\tPrevious Total\tViolated Concepts In Previous Releases";
 			writer.write(reportHeader);
@@ -135,7 +134,7 @@ public class Application {
 	
 	
 	private void createSummaryReport(File resultDir, String releasePackage, String releaseDate, boolean isStatedViewOnly, ValidationRun run) throws IOException {
-		File report = new File(resultDir,"MrcmSummaryReport.txt");
+		File report = new File(resultDir,"MRCMSummaryReport.txt");
 		int totalAttribute = 0; 
 		for (String key: run.getMRCMDomains().keySet()) {
 			Domain domain = run.getMRCMDomains().get(key);
