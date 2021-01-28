@@ -113,6 +113,7 @@ public class Attribute {
 	 String result = "Attribute [attributeId=" + attributeId + ", contentTypeId=" + contentTypeId + ", ruleStrengthId=" + ruleStrengthId;
 	 if (Type.RANGE == type) {
 		 result += ", rangeConstraint=" + rangeConstraint;
+		 result += ", rangeRule=" + rangeRule;
 	 } 
 	 return  result +=']';
 	}

@@ -61,7 +61,7 @@ public class ValidationServiceTest {
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(255,run.getCompletedAssertions().size());
 		assertEquals(141,run.getSkippedAssertions().size());
-		assertEquals(6,run.getFailedAssertions().size());
+		assertEquals(7,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);
 		}
@@ -133,14 +133,24 @@ public class ValidationServiceTest {
 		assertEquals(86,run.getCompletedAssertions().size());
 		//skipped assertions
 		assertEquals(4, run.getSkippedAssertions().size());
-		assertEquals(2,run.getFailedAssertions().size());
-		List<String> expectedFailed = Arrays.asList("363698007", "3311482005");
+		assertEquals(3,run.getFailedAssertions().size());
+		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "272741003");
 		for (Assertion assertion : run.getFailedAssertions()) {
 			System.out.println(assertion);
 			assertTrue(expectedFailed.contains(assertion.getAttribute().getAttributeId()));
 			if ("363698007".equals(assertion.getAttribute().getAttributeId())) {
 				assertEquals("<< 442083009 |Anatomical or acquired body structure (body structure)|", assertion.getAttribute().getRangeConstraint());
-				assertTrue(assertion.getCurrentViolatedConceptIds().contains(new Long("29857009")));
+				assertTrue(assertion.getCurrentViolatedConceptIds().contains(29857009L));
+			}
+			if ("272741003".equals(assertion.getAttribute().getAttributeId())) {
+				assertEquals("<< 182353008 |Side (qualifier value)|", assertion.getAttribute().getRangeConstraint());
+				assertEquals(2, assertion.getCurrentViolatedConceptIds().size());
+				assertTrue(assertion.getCurrentViolatedConceptIds().contains(91723000L));
+				assertTrue(assertion.getCurrentViolatedConceptIds().contains(113343008L));
+			}
+			if ("3311482005".equals(assertion.getAttribute().getAttributeId())) {
+				assertEquals(1, assertion.getCurrentViolatedConceptIds().size());
+				assertTrue(assertion.getCurrentViolatedConceptIds().contains(375745003L));
 			}
 		}
 	}
@@ -154,14 +164,13 @@ public class ValidationServiceTest {
 		assertEquals(100,run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
-			System.out.println(assertion);
 			assertEquals("272741003", assertion.getAttribute().getAttributeId());
 			assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
 			assertEquals(2,assertion.getCurrentViolatedConceptIds().size());
-			List<Long> expected = Arrays.asList(Long.valueOf("91723000"));
+			List<Long> expected = Arrays.asList(91723000L);
 			assertEquals(2, assertion.getCurrentViolatedConceptIds().size());
-			assertTrue(assertion.getCurrentViolatedConceptIds().contains(Long.valueOf("91723000")));
-			assertTrue(assertion.getCurrentViolatedConceptIds().contains(Long.valueOf("113343008")));
+			assertTrue(assertion.getCurrentViolatedConceptIds().contains(91723000L));
+			assertTrue(assertion.getCurrentViolatedConceptIds().contains(113343008L));
 		}
 	}
 	
@@ -182,7 +191,7 @@ public class ValidationServiceTest {
 			if ("363698007".equals(assertion.getAttribute().getAttributeId())) {
 				assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
 				assertEquals(1,assertion.getCurrentViolatedConceptIds().size());
-				List<Long> expected = Arrays.asList(Long.valueOf("404684003"));
+				List<Long> expected = Arrays.asList(404684003L);
 				assertEquals(expected,assertion.getCurrentViolatedConceptIds());
 			}
 		}
@@ -224,7 +233,9 @@ public class ValidationServiceTest {
 		// Has presentation strength denominator value concrete (attribute)
 		runValidationForAttribute("3311482005", Arrays.asList(ValidationType.ATTRIBUTE_RANGE, ValidationType.ATTRIBUTE_CARDINALITY));
 		run.getFailedAssertions().stream().forEach(System.out::println);
-		run.getCompletedAssertions().stream().forEach(System.out::println);
 		assertEquals(1, run.getFailedAssertions().size());
+		for (Assertion failed : run.getFailedAssertions()) {
+			assertEquals(375745003, failed.getCurrentViolatedConceptIds().get(0).longValue());
+		}
 	}
 }

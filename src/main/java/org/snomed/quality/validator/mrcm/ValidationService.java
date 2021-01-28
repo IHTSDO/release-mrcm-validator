@@ -1,5 +1,6 @@
 package org.snomed.quality.validator.mrcm;
 
+import com.google.common.base.Strings;
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.snomedboot.ReleaseImporter;
 import org.ihtsdo.otf.snomedboot.domain.Concept;
@@ -419,37 +420,70 @@ public class ValidationService {
 					continue;
 				}
 				validationProcessed.add(rangeKey);
-				// Find concepts in this domain where the value of this attribute is outside of the permitted range
-				LOGGER.info("Asserting domain:'{}', attribute:'{}', range:'{}'", domainConstraint, attributeId, rangeConstraint);
-				if (rangeConstraint == null) {
-					LOGGER.error("Invalid attribute range is found:" +  attributeRange);
-					continue;
+				if (Strings.isNullOrEmpty(rangeConstraint) || Strings.isNullOrEmpty(attributeRange.getRangeRule())) {
+					throw new IllegalStateException("No attribute range constraint or rule is defined in attribute range " +  attributeRange);
 				}
 				if (precoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
-					String baseEcl = domainConstraint;
-					baseEcl += baseEcl.contains(":") ? ", " : ": ";
-					baseEcl += attributeId;
-					String matchAllAttributeValues = baseEcl + " = *";
 					String matchRangeRule = removeCardinality(attributeRange.getRangeRule());
-					// All concepts
-					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domainConstraint, attributeId, matchAllAttributeValues);
-					List<Long> conceptsWithAnyAttributeValue = queryService.eclQueryReturnConceptIdentifiers(matchAllAttributeValues, 0, -1).getConceptIds();
-
-					LOGGER.info("Selecting content within domain '{}' with attribute '{}' within range constraint using expression '{}'", domainConstraint, attributeId, matchRangeRule);
-					List<Long> conceptsWithAttributeValueWithinRange = queryService.eclQueryReturnConceptIdentifiers(matchRangeRule, 0, -1).getConceptIds();
-
-					List<Long> conceptIdsWithInvalidAttributeValue = new ArrayList<>();
-					if (conceptsWithAnyAttributeValue.size() > conceptsWithAttributeValueWithinRange.size()) {
-						LOGGER.info("Invalid content found. Collecting identifiers.");
-						conceptIdsWithInvalidAttributeValue.addAll(conceptsWithAnyAttributeValue);
-						conceptIdsWithInvalidAttributeValue.removeAll(conceptsWithAttributeValueWithinRange);
-					} 
+					String outOfRangeRule = constructOutOfRangeRule(matchRangeRule);
+					LOGGER.info("Selecting content out of range for attribute '{}' with out range constraint expression '{}'",attributeId, outOfRangeRule);
+					List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(outOfRangeRule, 0, -1).getConceptIds();
 					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null, modules);
 				} else {
 					run.addSkippedAssertion(constructAssertion(queryService, attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
 				}
 			}
 		}
+	}
+
+	private static String constructOutOfRangeRule(String rangeRule) {
+		Map<String, String> replacementMap = new HashMap<>();
+		replacementMap.put("<", ">=");
+		replacementMap.put(">", "<=");
+		replacementMap.put("<=", ">");
+		replacementMap.put(">=", "<");
+		replacementMap.put("=", "!=");
+		replacementMap.put("!=", "=");
+
+		String[] splits = rangeRule.split("\\s+");
+		StringBuilder builder = new StringBuilder();
+		String previous = null;
+		boolean isConcrete = false;
+		boolean isInScope = false;
+		for (String split : splits) {
+			if (split.contains("(")) {
+				isInScope = true;
+			}
+			if (split.contains(")")) {
+				isInScope = false;
+			}
+			if (split.startsWith("#") || split.startsWith("\"")) {
+				isConcrete = true;
+				if (previous != null && replacementMap.containsKey(previous)) {
+					builder.append(replacementMap.get(previous));
+					builder.append(" ");
+				}
+			} else {
+				if (previous != null) {
+					if ((previous.equals("=") || previous.equals("!=")) && !split.startsWith("*")) {
+						// replace = with != for non wildcard range constraint
+						builder.append(replacementMap.get(previous));
+					} else {
+						builder.append(previous);
+					}
+					builder.append(" ");
+				}
+			}
+			if (isConcrete && isInScope) {
+				previous = split.equalsIgnoreCase("AND") ? "OR" : split;
+			} else {
+				previous = split;
+			}
+		}
+		if (previous != null) {
+			builder.append(previous);
+		}
+		return builder.toString();
 	}
 
 	private String removeCardinality(String rangeRule) {
