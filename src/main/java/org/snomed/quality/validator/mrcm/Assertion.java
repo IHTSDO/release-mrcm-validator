@@ -109,7 +109,7 @@ public class Assertion {
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 			assertionText += " " + attribute.getRangeConstraint();
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
-			assertionText +=  domainConstraint != null ? domainConstraint : " ";
+			assertionText += domainConstraint != null ? (" " + domainConstraint) : " ";
 		}
 		return assertionText;
 	}

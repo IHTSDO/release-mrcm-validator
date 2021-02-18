@@ -4,10 +4,7 @@ import static org.junit.Assert.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
@@ -59,11 +56,24 @@ public class ValidationServiceTest {
 	public void testValidationForAll() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(255,run.getCompletedAssertions().size());
-		assertEquals(141,run.getSkippedAssertions().size());
-		assertEquals(7,run.getFailedAssertions().size());
+		assertEquals(258,run.getCompletedAssertions().size());
+		assertEquals(0,run.getSkippedAssertions().size());
+		assertEquals(10,run.getFailedAssertions().size());
+
+		List<String> failedMessages = Arrays.asList(
+		"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute group cardinality [0..1]",
+		"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
+		"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute domain range << 442083009 |Anatomical or acquired body structure (body structure)|",
+		"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
+		"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain range << 182353008 |Side (qualifier value)|",
+		"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute group cardinality [0..1]",
+		"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute cardinality [0..1]",
+		"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
+		"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute domain range dec(#10..#20)",
+		"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain << 91723000 |Anatomical structure (body structure)|");
+
 		for (Assertion assertion : run.getFailedAssertions()) {
-			System.out.println(assertion);
+			assertTrue(failedMessages.contains(assertion.getAssertionText()));
 		}
 	}
 
@@ -132,7 +142,7 @@ public class ValidationServiceTest {
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(86,run.getCompletedAssertions().size());
 		//skipped assertions
-		assertEquals(4, run.getSkippedAssertions().size());
+		assertEquals(0, run.getSkippedAssertions().size());
 		assertEquals(3,run.getFailedAssertions().size());
 		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "272741003");
 		for (Assertion assertion : run.getFailedAssertions()) {
@@ -161,7 +171,6 @@ public class ValidationServiceTest {
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_CARDINALITY));
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(2,run.getCompletedAssertions().size());
-		assertEquals(100,run.getSkippedAssertions().size());
 		assertEquals(1,run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
 			assertEquals("272741003", assertion.getAttribute().getAttributeId());
@@ -173,8 +182,19 @@ public class ValidationServiceTest {
 			assertTrue(assertion.getCurrentViolatedConceptIds().contains(113343008L));
 		}
 	}
-	
-	
+
+	@Test
+	public void testReportWithSkippedAssertions() throws Exception {
+		run = new ValidationRun(null,false, true);
+		validationService.loadMRCM(releaseTestFile, run);
+		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
+		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+		Assert.notNull(run.getMRCMDomains(),"Domain should not be null");
+		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+		validationService.validateRelease(releaseTestFile, run);
+		assertTrue(run.reportSkippedAssertions());
+		assertEquals(37,run.getSkippedAssertions().size());
+	}
 	
 	@Test
 	public void testAttributeGroupCardinality() throws Exception {
@@ -182,7 +202,7 @@ public class ValidationServiceTest {
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(65,run.getCompletedAssertions().size());
-		assertEquals(37,run.getSkippedAssertions().size());
+		assertEquals(0,run.getSkippedAssertions().size());
 		assertEquals(2,run.getFailedAssertions().size());
 		List<String> expectedFailed = Arrays.asList("363698007", "3311482005");
 		for (Assertion assertion : run.getFailedAssertions()) {
@@ -218,9 +238,10 @@ public class ValidationServiceTest {
 		run.setValidationTypes(Arrays.asList(ValidationType.ATTRIBUTE_DOMAIN));
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(1, run.getAssertionsWithWarning().size());
+		String failureMsg = "The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain " +
+				"<< ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|";
 		for (Assertion assertion : run.getAssertionsWithWarning()) {
-			System.out.println(assertion.getAssertionText());
-			System.out.println(assertion);
+			assertEquals(failureMsg, assertion.getAssertionText());
 			assertEquals(attributeId, assertion.getAttribute().getAttributeId());
 			assertEquals(FailureType.WARNING, assertion.getFailureType());
 			assertEquals(6, assertion.getCurrentViolatedConceptIds().size());
@@ -232,9 +253,28 @@ public class ValidationServiceTest {
 	public void testValidationForConcreteValue() throws Exception {
 		// Has presentation strength denominator value concrete (attribute)
 		runValidationForAttribute("3311482005", Arrays.asList(ValidationType.ATTRIBUTE_RANGE, ValidationType.ATTRIBUTE_CARDINALITY));
-		run.getFailedAssertions().stream().forEach(System.out::println);
+		String failureMsg = "The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| " +
+				"must conform to the MRCM attribute domain range dec(#10..#20)";
 		assertEquals(1, run.getFailedAssertions().size());
 		for (Assertion failed : run.getFailedAssertions()) {
+			assertEquals(failureMsg, failed.getAssertionText());
+			assertEquals(375745003, failed.getCurrentViolatedConceptIds().get(0).longValue());
+		}
+	}
+
+
+	@Test
+	public void testValidationForConcreteDataType() throws Exception {
+		// Has presentation strength denominator value concrete (attribute)
+		runValidationForAttribute("3311482005", Arrays.asList(ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE));
+		List<String> failureMsgs = Arrays.asList(
+				"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
+				"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
+				"The attribute value of 3311482005 must conform to the MRCM concrete attribute data type"
+		);
+		assertEquals(3, run.getFailedAssertions().size());
+		for (Assertion failed : run.getFailedAssertions()) {
+			assertTrue(failureMsgs.contains(failed.getAssertionText()));
 			assertEquals(375745003, failed.getCurrentViolatedConceptIds().get(0).longValue());
 		}
 	}

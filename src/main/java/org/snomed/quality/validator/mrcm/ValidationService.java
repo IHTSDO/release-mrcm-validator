@@ -35,26 +35,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Long.parseLong;
+import static org.snomed.quality.validator.mrcm.Constants.*;
 
 public class ValidationService {
-	private static final String CONTENT_TYPE_IS_OUT_OF_SCOPE = "Content type is out of scope:";
-	private static final String NO_CARDINALITY_CONSTRAINT = "0..*";
-	public static final String MANDATORY = "723597001";
-	public static final String OPTIONAL = "723598006";
-	public static final String MRCM_DOMAIN_REFSET = "723560006";
-	public static final String MRCM_ATTRIBUTE_DOMAIN_REFSET = "723561005";
-	public static final String MRCM_ATTRIBUTE_RANGE_REFSET = "723562003";
-	public static final String LATERALIZABLE_BODY_STRUCTURE_REFSET = "723264001";
-	public static final String OWL_AXIOM_REFSET = "733073007";
 	public static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
 			.withFullRefsetMemberObjects()
 			.withJustRefsets();
-	public static final String ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT = "723593002";
-	
-	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
 
-	private Set<Long> ungroupedAttributes = new HashSet<>();
+	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
 
 	public void loadMRCM(File sourceDirectory, ValidationRun run) throws ReleaseImportException {
 		MRCMFactory mrcmFactory = new MRCMFactory();
@@ -65,14 +54,21 @@ public class ValidationService {
 			Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null.");
 		}
 		run.setMRCMDomains(domains);
+		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
+		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
+		if (run.getValidationTypes().contains(ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE)) {
+			// Concrete attribute data type validation
+			ConcreteAttributeDataTypeValidationService dataTypeValidationService = new ConcreteAttributeDataTypeValidationService();
+			dataTypeValidationService.validate(releaseDirectory, run);
+		}
 		executeValidation(releaseDirectory, run, modules);
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
-		executeValidation(releaseDirectory, run, Collections.emptySet());
+		validateRelease(releaseDirectory, run, Collections.emptySet());
 	}
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
@@ -82,32 +78,33 @@ public class ValidationService {
 				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()
 				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
-		OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore());
+		OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore(), run.getUngroupedAttributes());
 		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionFactory);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
 
 		//checking data is loaded properly
 		LOGGER.info("Total concepts loaded {}", queryService.getConceptCount());
-		
-		List<Long> precoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT, 0, 100).getConceptIds();
-		Assert.notEmpty(precoordinatedTypes, "Concept " + ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT + " and descendants must be accessible.");
+		List<Long> preCoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT, 0, 100).getConceptIds();
+		Assert.notEmpty(preCoordinatedTypes, "Concept " + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT + " and descendants must be accessible.");
 		for (ValidationType type : run.getValidationTypes()) {
 			switch (type) {
-			case ATTRIBUTE_DOMAIN :
-				executeAttributeDomainValidation(run, queryService, precoordinatedTypes, modules);
-				break;
-			case ATTRIBUTE_RANGE :
-				executeAttributeRangeValidation(run, queryService, precoordinatedTypes, modules);
-				break;
-			case ATTRIBUTE_CARDINALITY :
-				executeAttributeCardinalityValidation(run, queryService, precoordinatedTypes, modules);
-				break;
-			case ATTRIBUTE_GROUP_CARDINALITY :
-				executeAttributeGroupCardinalityValidation(run, queryService, precoordinatedTypes, modules);
-				break;
-			default :
-				LOGGER.error("ValidationType:" + type + " is not implemented yet!");
-				break;
+				case ATTRIBUTE_DOMAIN :
+					executeAttributeDomainValidation(run, queryService, preCoordinatedTypes, modules);
+					break;
+				case ATTRIBUTE_RANGE :
+					executeAttributeRangeValidation(run, queryService, preCoordinatedTypes, modules);
+					break;
+				case ATTRIBUTE_CARDINALITY :
+					executeAttributeCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
+					break;
+				case ATTRIBUTE_GROUP_CARDINALITY :
+					executeAttributeGroupCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
+					break;
+				case CONCRETE_ATTRIBUTE_DATA_TYPE :
+					break;
+				default :
+					LOGGER.error("ValidationType:" + type + " is not implemented yet!");
+					break;
 			}
 		}
 	}
@@ -175,7 +172,7 @@ public class ValidationService {
 			if (newInvalidConcepts.size() > currentRelease.size()) {
 				msg += " Total failures=" + newInvalidConcepts.size() + ". Failures with release date:" + run.getReleaseDate() + "=" + currentRelease.size();
 			}
-			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
+			if (ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				run.addCompletedAssertion(constructAssertion(queryService, attribute, type, msg, currentRelease, null, domainConstraint));
 			} else {
 				newInvalidConcepts.removeAll(currentRelease);
@@ -183,7 +180,7 @@ public class ValidationService {
 			}
 		} else {
 			// for ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT display message that no effect date is supplied
-			if (ALL_NEW_PRECOORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
+			if (ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT.equals(attribute.getContentTypeId())) {
 				msg += " Content type is for new concept only but there is no current release date specified.";
 			}
 			for (Long conceptId : invalidIds) {
@@ -269,7 +266,7 @@ public class ValidationService {
 	 * @throws ServiceException *
 	 * 
 	*/
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh, Set <String> modules) throws ServiceException {
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh, Set<String> modules) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, List<Attribute>> attributesById = new HashMap<>();
 		filterAttributeDomainByStrength(run, queryService, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
@@ -519,6 +516,7 @@ public class ValidationService {
 
 		private Map<String, Domain> domains = new HashMap<>();
 		private Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
+		private Set<Long> ungroupedAttributes = new HashSet<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
@@ -594,6 +592,10 @@ public class ValidationService {
 			return attribute;
 		}
 
+		public Map<String, List<Attribute>> getAttributeRangeMap() {
+			return attributeRangeMap;
+		}
+
 		public Attribute createAttributeRange(String uuid, String attributeId, String... otherValues) {
 			Attribute attribute = new Attribute(attributeId, otherValues[ranContentTypeIndex]);
 			if (uuid != null && !uuid.isEmpty()) {
@@ -612,6 +614,10 @@ public class ValidationService {
 			}
 			updateDomainWithAttributeRange();
 			return attribute;
+		}
+
+		public Set<Long> getUngroupedAttributes() {
+			return ungroupedAttributes;
 		}
 
 		private void loadUngroupedAttributes(String active, String referencedComponentId, String... otherValues) {
@@ -633,7 +639,7 @@ public class ValidationService {
 		private final Logger logger = LoggerFactory.getLogger(getClass());
 		private final ComponentStore componentStore;
 
-		public OWLExpressionFactory(ComponentStore componentStore) {
+		public OWLExpressionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes) {
 			super(componentStore);
 			this.componentStore = componentStore;
 			axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
