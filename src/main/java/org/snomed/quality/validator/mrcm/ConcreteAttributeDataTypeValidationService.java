@@ -122,6 +122,10 @@ public class ConcreteAttributeDataTypeValidationService {
 			if (OWL_AXIOM_REFSET.equals(refsetId)) {
 				try {
 					AxiomRepresentation axiom = conversionService.convertAxiomToRelationships(otherValues[0]);
+					if (axiom == null) {
+						// not an axiom so skip and do nothing
+						return;
+					}
 					Set<Relationship> relationships = new HashSet<>();
 					if (axiom.getLeftHandSideRelationships() != null) {
 						axiom.getLeftHandSideRelationships().values().stream().forEach(values -> relationships.addAll(values));
