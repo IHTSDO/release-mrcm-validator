@@ -61,13 +61,13 @@ public class ConcreteAttributeDataTypeValidationService {
 
 	private static class DataTypeValidationComponentFactory extends ImpotentComponentFactory {
 
-		private Map<String, Type> concreteAttributeDataTypeMap;
-		private Map<String, Set<Long>> attributeToViolatedConceptsMap;
-		private Map<String, String> attributeToFailureMsgMap;
-		private final String TYPE_NOT_MATCHING_MSG_FORMAT = "Concrete value of %s is not a type of %s as defined in the MRCM";
-		private final String NO_DATA_TYPE_DEFINED_MSG_FORMAT = "Concrete value %s found but no concrete data type is defined in the MRCM range constraint";
-		private final String INVALID_CONCRETE_VALUE_MSG_FORMAT = "Concrete value %s found but not starting with # or \"";
-		private AxiomRelationshipConversionService conversionService;
+		private final Map<String, Type> concreteAttributeDataTypeMap;
+		private final Map<String, Set<Long>> attributeToViolatedConceptsMap;
+		private final Map<String, String> attributeToFailureMsgMap;
+		private static final String TYPE_NOT_MATCHING_MSG_FORMAT = "Concrete value of %s is not a type of %s as defined in the MRCM";
+		private static final String NO_DATA_TYPE_DEFINED_MSG_FORMAT = "Concrete value %s found but no concrete data type is defined in the MRCM range constraint";
+		private static final String INVALID_CONCRETE_VALUE_MSG_FORMAT = "Concrete value %s found but not starting with # or \"";
+		private final AxiomRelationshipConversionService conversionService;
 
 		public DataTypeValidationComponentFactory(Map<String, Type> concreteAttributeDataTypeMap, AxiomRelationshipConversionService conversionService) {
 			this.concreteAttributeDataTypeMap = concreteAttributeDataTypeMap;

@@ -3,7 +3,11 @@ package org.snomed.quality.validator.mrcm.model;
 import java.util.UUID;
 
 public class Attribute {
-	public static enum Type {DOMAIN, RANGE};
+
+	public enum Type {
+		DOMAIN,
+		RANGE
+	}
 
 	private UUID uuid;
 
