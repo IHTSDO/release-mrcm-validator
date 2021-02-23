@@ -59,11 +59,6 @@ public class ValidationService {
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
-		if (run.getValidationTypes().contains(ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE)) {
-			// Concrete attribute data type validation
-			ConcreteAttributeDataTypeValidationService dataTypeValidationService = new ConcreteAttributeDataTypeValidationService();
-			dataTypeValidationService.validate(releaseDirectory, run);
-		}
 		executeValidation(releaseDirectory, run, modules);
 	}
 
@@ -101,10 +96,27 @@ public class ValidationService {
 					executeAttributeGroupCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
 					break;
 				case CONCRETE_ATTRIBUTE_DATA_TYPE :
+					executeConcreteDataTypeValidation(releaseDirectory, run, queryService, modules);
 					break;
 				default :
 					LOGGER.error("ValidationType:" + type + " is not implemented yet!");
 					break;
+			}
+		}
+	}
+
+	private void executeConcreteDataTypeValidation(File releaseDirectory, ValidationRun run, SnomedQueryService queryService, Set<String> modules) throws ReleaseImportException, ServiceException {
+		// Concrete attribute data type validation
+		ConcreteAttributeDataTypeValidationService dataTypeValidationService = new ConcreteAttributeDataTypeValidationService();
+		dataTypeValidationService.validate(releaseDirectory, run);
+		for (Assertion assertion : run.getFailedAssertions()) {
+			List<Long> conceptIds = assertion.getCurrentViolatedConceptIds();
+			for (Long conceptId : conceptIds) {
+				ConceptResult result = queryService.retrieveConcept(String.valueOf(conceptId));
+				if (!modules.isEmpty() && !modules.contains(result.getModuleId())) {
+					continue;
+				}
+				assertion.getCurrentViolatedConcepts().add(result);
 			}
 		}
 	}

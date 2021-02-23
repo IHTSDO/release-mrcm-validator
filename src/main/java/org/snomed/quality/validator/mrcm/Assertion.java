@@ -42,14 +42,12 @@ public class Assertion {
 		this.failureType = failureType;
 		this.currentViolatedConceptIds = new ArrayList<>();
 		this.previousViolatedConceptIds = new ArrayList<>();
-		domainConstraint = null;
+		this.currentViolatedConcepts = new ArrayList<>();
 	}
 	
 	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType, List<Long> currentViolatedConceptIds) {
 		this(attribute, type, msg, failureType);
-		this.currentViolatedConceptIds = currentViolatedConceptIds == null ?  
-				new ArrayList<>() : currentViolatedConceptIds;
-		
+		this.currentViolatedConceptIds = currentViolatedConceptIds == null ? new ArrayList<>() : currentViolatedConceptIds;
 	}
 		
 	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType,

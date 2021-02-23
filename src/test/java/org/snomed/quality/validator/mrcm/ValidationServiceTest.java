@@ -274,6 +274,11 @@ public class ValidationServiceTest {
 		);
 		assertEquals(3, run.getFailedAssertions().size());
 		for (Assertion failed : run.getFailedAssertions()) {
+			assertNotNull(failed.getCurrentViolatedConcepts());
+			assertEquals(1, failed.getCurrentViolatedConcepts().size());
+			assertEquals("375745003", failed.getCurrentViolatedConcepts().get(0).getId());
+			assertEquals("Product containing precisely metolazone 500 microgram/1 each conventional release oral tablet (clinical drug)",
+					failed.getCurrentViolatedConcepts().get(0).getFsn());
 			assertTrue(failureMsgs.contains(failed.getAssertionText()));
 			assertEquals(375745003, failed.getCurrentViolatedConceptIds().get(0).longValue());
 		}
