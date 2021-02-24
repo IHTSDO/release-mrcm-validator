@@ -70,9 +70,9 @@ public class ConcreteAttributeDataTypeValidationService {
 
 		private static final String AXIOM_LABEL = "Axiom";
 		private static final String RELATIONSHIP_LABEL = "Relationship";
-		private static final String TYPE_NOT_MATCHING_MSG_FORMAT = "%s concrete value of %s is not a type of %s as defined in the MRCM for concept %s";
-		private static final String NO_DATA_TYPE_DEFINED_MSG_FORMAT = "%s concrete value %s found but no concrete data type is defined in the MRCM range constraint for concept %s";
-		private static final String INVALID_CONCRETE_VALUE_MSG_FORMAT = "%s concrete value %s found but not starting with # or \" for concept %s";
+		private static final String TYPE_NOT_MATCHING_MSG_FORMAT = "%s concrete value of %s is not a type of %s as defined in the MRCM.";
+		private static final String NO_DATA_TYPE_DEFINED_MSG_FORMAT = "%s concrete value %s found but no concrete data type is defined in the MRCM range constraint.";
+		private static final String INVALID_CONCRETE_VALUE_MSG_FORMAT = "%s concrete value %s found but not starting with # or \".";
 
 		private final Map<String, Type> concreteAttributeDataTypeMap;
 		private final Map<String, Set<Long>> attributeToViolatedConceptsMap;
@@ -110,24 +110,21 @@ public class ConcreteAttributeDataTypeValidationService {
 				} else {
 					// check concrete value
 					if (value.startsWith("#") || value.startsWith("\"")) {
-						addAttributeToViolatedConceptsMap(sourceId, typeId, String.format(NO_DATA_TYPE_DEFINED_MSG_FORMAT, RELATIONSHIP_LABEL, value, sourceId));
+						addAttributeToViolatedConceptsMap(sourceId, typeId, String.format(NO_DATA_TYPE_DEFINED_MSG_FORMAT, RELATIONSHIP_LABEL, value));
 					} else {
 						// report as invalid
-						attributeToFailureMsgMap.put(typeId, String.format(INVALID_CONCRETE_VALUE_MSG_FORMAT, RELATIONSHIP_LABEL, value, sourceId));
+						addAttributeToViolatedConceptsMap(sourceId, typeId, String.format(INVALID_CONCRETE_VALUE_MSG_FORMAT, RELATIONSHIP_LABEL, value));
+
 					}
 				}
 			}
 		}
 
 		private void addAttributeToViolatedConceptsMap(final String sourceId, final String typeId, final String failureMsg) {
-			addAttributeToFailureMsgMapIfTypeNotAlreadyExistsInsideMap(typeId, failureMsg);
-			attributeToViolatedConceptsMap.computeIfAbsent(typeId, k -> new HashSet<>()).add(Long.parseLong(sourceId));
-		}
-
-		private void addAttributeToFailureMsgMapIfTypeNotAlreadyExistsInsideMap(final String typeId, final String failureMsg) {
 			if (!attributeToFailureMsgMap.containsKey(typeId)) {
 				attributeToFailureMsgMap.put(typeId, failureMsg);
 			}
+			attributeToViolatedConceptsMap.computeIfAbsent(typeId, k -> new HashSet<>()).add(Long.parseLong(sourceId));
 		}
 
 		private String constructFailureMessage(String conceptId, String attributeId, final String prefix, final String value, final Type dataType) {
