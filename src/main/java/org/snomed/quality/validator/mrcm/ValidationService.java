@@ -259,7 +259,7 @@ public class ValidationService {
 	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
 		Set<String> validationCompleted = new HashSet<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
-			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes,validationCompleted, modules);
+			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes, validationCompleted, modules);
 		}
 	}
 

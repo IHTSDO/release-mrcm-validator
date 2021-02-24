@@ -41,17 +41,29 @@ public class ConcreteAttributeDataTypeValidationService {
 		DataTypeValidationComponentFactory componentFactory = new DataTypeValidationComponentFactory(concreteAttributeDataTypeMap, conversionService);
 		releaseImporter.loadSnapshotReleaseFiles(file.getAbsolutePath(), profile, componentFactory);
 
-		for (String attributeId : componentFactory.getAttributeToViolatedConceptsMap().keySet()) {
-			Attribute attribute = attributeRangeMap.get(attributeId);
-			if (attribute == null) {
-				attribute = new Attribute(attributeId, ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT);
-				attribute.setUuid(UUID.fromString(NO_DATA_TYPE_DEFINED_ASSERTION_UUID));
+		// Add assertions for all concrete attributes defined in the MRCM
+		attributeRangeMap.values().stream().forEach(attribute -> {
+			Assertion assertion = null;
+			if (componentFactory.getAttributeToViolatedConceptsMap().containsKey(attribute.getAttributeId())) {
+				List<Long> conceptIds = new ArrayList<>(componentFactory.getAttributeToViolatedConceptsMap().get(attribute.getAttributeId()));
+				String failureMsg = componentFactory.getAttributeToFailureMsgMap().get(attribute.getAttributeId());
+				assertion = new Assertion(attribute, ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE, failureMsg, Assertion.FailureType.ERROR, conceptIds);
+			} else {
+				assertion = new Assertion(attribute, ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE, null, Assertion.FailureType.ERROR);
 			}
+			run.addCompletedAssertion(assertion);
+		});
+
+		// Add failed assertions for concrete attribute values found but with no data type defined in MRCM
+		componentFactory.getAttributeToViolatedConceptsMap().keySet().stream()
+				.filter(attributeId -> !attributeRangeMap.containsKey(attributeId)).forEach(attributeId -> {
+			Attribute attribute = new Attribute(attributeId, ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT);
+			attribute.setUuid(UUID.fromString(NO_DATA_TYPE_DEFINED_ASSERTION_UUID));
 			List<Long> conceptIds = new ArrayList<>(componentFactory.getAttributeToViolatedConceptsMap().get(attributeId));
 			String failureMsg = componentFactory.getAttributeToFailureMsgMap().get(attributeId);
 			Assertion assertion = new Assertion(attribute, ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE, failureMsg, Assertion.FailureType.ERROR, conceptIds);
 			run.addCompletedAssertion(assertion);
-		}
+		});
 	}
 
 	private static class DataTypeValidationComponentFactory extends ImpotentComponentFactory {

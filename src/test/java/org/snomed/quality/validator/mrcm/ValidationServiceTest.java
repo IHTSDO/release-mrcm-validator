@@ -58,7 +58,7 @@ public class ValidationServiceTest {
 	public void testValidationForAll() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(266, run.getCompletedAssertions().size());
+		assertEquals(267, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		assertEquals(14, run.getFailedAssertions().size());
 
