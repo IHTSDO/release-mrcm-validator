@@ -99,7 +99,7 @@ public class ValidationService {
 					executeConcreteDataTypeValidation(releaseDirectory, run, queryService, modules);
 					break;
 				default :
-					LOGGER.error("ValidationType:" + type + " is not implemented yet!");
+					LOGGER.error("Validation Type: '{}' is not implemented yet!", type);
 					break;
 			}
 		}

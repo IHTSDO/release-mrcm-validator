@@ -65,7 +65,7 @@ public class ValidationRun {
 	}
 	
 	public Set<Assertion> getFailedAssertions() {
-		return assertionsCompleted.stream().filter(Assertion :: reportAsError).filter(Assertion :: invalidConceptsFound).collect(Collectors.toSet());
+		return assertionsCompleted.stream().filter(Assertion::reportAsError).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
 	
 	public Set<Assertion> getAssertionsWithWarning() {
