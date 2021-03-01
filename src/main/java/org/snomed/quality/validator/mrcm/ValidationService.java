@@ -92,7 +92,7 @@ public class ValidationService {
 				case ATTRIBUTE_CARDINALITY :
 					executeAttributeCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
 					break;
-				case ATTRIBUTE_GROUP_CARDINALITY :
+				case ATTRIBUTE_IN_GROUP_CARDINALITY:
 					executeAttributeGroupCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
 					break;
 				case CONCRETE_ATTRIBUTE_DATA_TYPE :
@@ -131,7 +131,7 @@ public class ValidationService {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
 					//skip
-					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
+					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
 					continue;
 				}
 				String domainPartEcl = "<<" + domain.getDomainId() + ":"; 
@@ -149,15 +149,15 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_GROUP_CARDINALITY, null, modules);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY, null, modules);
 				} else {
-					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_GROUP_CARDINALITY.getName() + " Skipped reason: ";
+					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY.getName() + " Skipped reason: ";
 					if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeInGroupCardinality())) {
 						skipMsg += " Attribute group cardinality constraint is " + attribute.getAttributeInGroupCardinality();
 					} else if (!attribute.isGrouped()) {
 						skipMsg += " Attribute constraint is not grouped.";
 					}
-					run.addSkippedAssertion(constructAssertion(queryService, attribute,ValidationType.ATTRIBUTE_GROUP_CARDINALITY, skipMsg));
+					run.addSkippedAssertion(constructAssertion(queryService, attribute,ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY, skipMsg));
 				}
 			}
 		}
@@ -433,9 +433,21 @@ public class ValidationService {
 					throw new IllegalStateException("No attribute range constraint or rule is defined in attribute range " +  attributeRange);
 				}
 				if (precoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
-					String matchRangeRule = removeCardinality(attributeRange.getRangeRule());
-					String outOfRangeRule = constructOutOfRangeRule(matchRangeRule);
-					LOGGER.info("Selecting content out of range for attribute '{}' with out range constraint expression '{}'",attributeId, outOfRangeRule);
+					String outOfRangeRule = null;
+					// check concrete attribute range constraint
+					if (isConcreteRangeConstraint(rangeConstraint)) {
+						String matchRangeRule = removeCardinality(attributeRange.getRangeRule());
+						outOfRangeRule = constructOutOfRangeRule(matchRangeRule);
+					} else {
+						String baseEcl = domainConstraint;
+						baseEcl += baseEcl.contains(":") ? ", " : ": ";
+						baseEcl += attributeId;
+						outOfRangeRule = baseEcl + " != ";
+						outOfRangeRule = containsMultipleConceptIds(rangeConstraint)
+								? outOfRangeRule + "(" + rangeConstraint + ")"
+								: outOfRangeRule + rangeConstraint;
+					}
+					LOGGER.info("Selecting content out of range for attribute '{}' with out range constraint expression '{}'", attributeId, outOfRangeRule);
 					List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(outOfRangeRule, 0, -1).getConceptIds();
 					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null, modules);
 				} else {
@@ -445,6 +457,19 @@ public class ValidationService {
 		}
 	}
 
+	private boolean isConcreteRangeConstraint(String rangeConstraint) {
+		for (Relationship.ConcreteValue.Type type : Relationship.ConcreteValue.Type.values()) {
+			if (rangeConstraint.startsWith(type.getShorthand())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean containsMultipleConceptIds(String expression) {
+		return expression.matches(".*(\\d){6,18}[^\\d]*(\\d){6,18}.*");
+	}
+	
 	private static String constructOutOfRangeRule(String rangeRule) {
 		Map<String, String> replacementMap = new HashMap<>();
 		replacementMap.put("<", ">=");

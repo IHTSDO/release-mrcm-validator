@@ -63,7 +63,7 @@ public class ReportService {
 		String type = isErrorReporting ? "WithError" : "WithWarning";
 		File report = new File(resultDir,"MRCMValidationReport" + type + ".txt");
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
-			String reportHeader = "Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Current Release\tPrevious Total\tViolated Concepts In Previous Releases";
+			String reportHeader = "Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Release\tPrevious Total\tViolated Concepts In Previous Releases";
 			writer.write(reportHeader);
 			writer.write(NEW_LINE);
 			int counter = 1;

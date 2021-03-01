@@ -200,9 +200,9 @@ public class ValidationServiceTest {
 		run = new ValidationRun(null, false, true);
 		validationService.loadMRCM(releaseTestFile, run);
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
-		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
-		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
 		validationService.validateRelease(releaseTestFile, run);
 		assertTrue(run.reportSkippedAssertions());
 		assertEquals(37, run.getSkippedAssertions().size());
@@ -211,7 +211,7 @@ public class ValidationServiceTest {
 	@Test
 	public void testAttributeGroupCardinality() throws Exception {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
-		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
 		validationService.validateRelease(releaseTestFile, run);
 		assertEquals(67, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
@@ -226,7 +226,7 @@ public class ValidationServiceTest {
 				assertEquals(" Content type is for new concept only but there is no current release date specified.", assertion.getMessage());
 			}
 			assertEquals(FailureType.ERROR, assertion.getFailureType());
-			assertTrue(run.getValidationTypes().contains(ValidationType.ATTRIBUTE_GROUP_CARDINALITY));
+			assertTrue(run.getValidationTypes().contains(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
 		});
 	}
 

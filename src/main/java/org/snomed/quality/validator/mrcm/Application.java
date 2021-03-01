@@ -3,6 +3,7 @@ package org.snomed.quality.validator.mrcm;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
