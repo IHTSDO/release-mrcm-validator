@@ -26,7 +26,7 @@ public class ValidationServiceTest {
 	@Before
 	public void setUp() throws ReleaseImportException {
 		validationService = new ValidationService();
-		run = new ValidationRun(null, false);
+		run = new ValidationRun(null, ValidationView.INFERRED, false);
 		releaseTestFile = Paths.get("src/test/resources/rf2TestFiles").toFile();
 		validationService.loadMRCM(releaseTestFile, run);
 	}
@@ -191,7 +191,7 @@ public class ValidationServiceTest {
 
 	@Test
 	public void testReportWithSkippedAssertions() throws Exception {
-		run = new ValidationRun(null, false, true);
+		run = new ValidationRun(null, ValidationView.INFERRED, true);
 		validationService.loadMRCM(releaseTestFile, run);
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));

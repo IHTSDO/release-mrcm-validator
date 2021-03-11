@@ -38,21 +38,20 @@ import static java.lang.Long.parseLong;
 import static org.snomed.quality.validator.mrcm.Constants.*;
 
 public class ValidationService {
-	public static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
+
+	private static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
 			.withFullRefsetMemberObjects()
 			.withJustRefsets();
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
-
-	public void loadMRCM(File sourceDirectory, ValidationRun run) throws ReleaseImportException {
-		MRCMFactory mrcmFactory = new MRCMFactory();
+	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
+		final MRCMFactory mrcmFactory = new MRCMFactory();
 		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory);
-		Map<String, Domain> domains = mrcmFactory.getDomains();
+		final Map<String, Domain> domains = mrcmFactory.getDomains();
 		Assert.notEmpty(domains, "No MRCM Domains Found");
-		for (Domain domain : domains.values()) {
-			Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null.");
-		}
+		domains.values().forEach(domain -> Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null."));
 		run.setMRCMDomains(domains);
 		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
 		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
@@ -67,7 +66,7 @@ public class ValidationService {
 	}
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
-		LoadingProfile profile = run.isStatedView() ?
+		LoadingProfile profile = run.getValidationView() == ValidationView.STATED ?
 				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
 				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
 				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()

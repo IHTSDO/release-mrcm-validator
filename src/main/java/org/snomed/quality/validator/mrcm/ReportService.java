@@ -1,21 +1,21 @@
 package org.snomed.quality.validator.mrcm;
 
-import org.snomed.quality.validator.mrcm.model.Domain;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static org.snomed.quality.validator.mrcm.Constants.NEW_LINE;
 import static org.snomed.quality.validator.mrcm.Constants.TAB;
 
 public class ReportService {
-	private File resultDir;
 
-	private String releasePackage;
+	private final File resultDir;
+
+	private final String releasePackage;
 
 	public ReportService(File resultDir, String releasePackage) {
 		this.resultDir = resultDir;
@@ -28,16 +28,15 @@ public class ReportService {
 	}
 
 	private void createValidationReport(File resultDir, ValidationRun run) throws IOException {
-		createValidationFailureReport(resultDir, run.getFailedAssertions(), true);
-		createValidationFailureReport(resultDir, run.getAssertionsWithWarning(), false);
+		createValidationFailureReport(resultDir, run, run.getFailedAssertions(), true);
+		createValidationFailureReport(resultDir, run, run.getAssertionsWithWarning(), false);
 		createSkippedAssertionsReport(resultDir, run);
 		createSuccessfulValidationReport(resultDir, run);
 	}
 
 	private void createSuccessfulValidationReport(File resultDir, ValidationRun run) throws IOException {
 		if (!run.getCompletedAssertions().isEmpty()) {
-			File successReport = new File(resultDir,"MRCMValidationPassed.txt");
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(successReport))) {
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir,"MRCM" + run.getValidationView().getView() + "ValidationPassed.txt")))) {
 				for (Assertion passed : run.getCompletedAssertions()) {
 					writer.write(passed.toString());
 					writer.write(NEW_LINE);
@@ -49,8 +48,7 @@ public class ReportService {
 	private void createSkippedAssertionsReport(File resultDir, ValidationRun run) throws IOException {
 		// Report skipped assertions and reasons
 		if (run.reportSkippedAssertions() && !run.getSkippedAssertions().isEmpty()) {
-			File skippedReport = new File(resultDir,"MRCMValidationSkipped.txt");
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(skippedReport))) {
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir,"MRCM" + run.getValidationView().getView() + "ValidationSkipped.txt")))) {
 				for (Assertion skipped : run.getSkippedAssertions()) {
 					writer.write(skipped.toString());
 					writer.write(NEW_LINE);
@@ -59,78 +57,68 @@ public class ReportService {
 		}
 	}
 
-	private void createValidationFailureReport(File resultDir, Set<Assertion> failures, boolean isErrorReporting) throws IOException {
-		String type = isErrorReporting ? "WithError" : "WithWarning";
-		File report = new File(resultDir,"MRCMValidationReport" + type + ".txt");
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
-			String reportHeader = "Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Release\tPrevious Total\tViolated Concepts In Previous Releases";
-			writer.write(reportHeader);
+	private void createValidationFailureReport(File resultDir, ValidationRun run, Set<Assertion> failures, boolean isErrorReporting) throws IOException {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir, "MRCM" + run.getValidationView().getView()
+				+ "ValidationReport" + (isErrorReporting ? "WithError" : "WithWarning") + ".txt")))) {
+			writer.write("Item\tUUID\tAssertion Text\tMessage\tCurrent Total\tViolated Concepts In Current Release\tPrevious Total\tViolated Concepts In Previous Releases");
 			writer.write(NEW_LINE);
 			int counter = 1;
 			for (Assertion failed : failures) {
-				StringBuilder builder = new StringBuilder();
-				builder.append(counter++);
-				builder.append(TAB);
-				builder.append(failed.getUuid().toString());
-				builder.append(TAB);
-				builder.append(failed.getAssertionText());
-				builder.append(TAB);
-				builder.append(failed.getMessage());
-				builder.append(TAB);
-				builder.append(failed.getCurrentViolatedConceptIds().size());
-				builder.append(TAB);
-				builder.append(extractInstances(failed.getCurrentViolatedConceptIds()).toString());
-				builder.append(TAB);
-				builder.append(failed.getPreviousViolatedConceptIds().size());
-				builder.append(TAB);
-				builder.append(extractInstances(failed.getPreviousViolatedConceptIds()).toString());
-				builder.append(NEW_LINE);
-				writer.write(builder.toString());
+				writer.write(counter++ + TAB + failed.getUuid().toString() + TAB + failed.getAssertionText() +
+						TAB + failed.getMessage() + TAB + failed.getCurrentViolatedConceptIds().size() + TAB +
+						extractInstances(failed.getCurrentViolatedConceptIds()) + TAB + failed.getPreviousViolatedConceptIds().size() +
+						TAB + extractInstances(failed.getPreviousViolatedConceptIds()) + NEW_LINE);
 			}
 		}
 	}
 
-
 	private void createSummaryReport(File resultDir, String releasePackage, ValidationRun run) throws IOException {
-		File report = new File(resultDir,"MRCMSummaryReport.txt");
-		int totalAttribute = 0;
-		for (String key: run.getMRCMDomains().keySet()) {
-			Domain domain = run.getMRCMDomains().get(key);
-			totalAttribute += domain.getAttributes().size();
-		}
+		final File report = new File(resultDir,"MRCMSummaryReport.txt");
+		final int totalAttribute = run.getMRCMDomains().keySet().stream().map(key -> run.getMRCMDomains().get(key))
+				.mapToInt(domain -> domain.getAttributes().size()).sum();
 
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(report))) {
-			StringBuilder reportSummary = new StringBuilder();
-			reportSummary.append("ReleasePackage:" + releasePackage);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("ReportingForReleaseCycle:" + run.getReleaseDate());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("isStatedViewOnly:" + run.isStatedView());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total MRCM domains loaded:" + run.getMRCMDomains().size());
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total MRCM attributes loaded:" + totalAttribute);
-			reportSummary.append(NEW_LINE);
-			reportSummary.append("Total assertions completed:" + run.getCompletedAssertions().size());
-			reportSummary.append(NEW_LINE);
-			if (run.reportSkippedAssertions()) {
-				reportSummary.append("Total assertions skipped:" + run.getSkippedAssertions().size());
-				reportSummary.append(NEW_LINE);
+		try (final BufferedWriter writer = new BufferedWriter(new FileWriter(report, true))) {
+			final StringBuilder reportSummary = new StringBuilder();
+			if (report.length() == 0) {
+				reportSummary.append("ReleasePackage: ")
+						.append(releasePackage)
+						.append(NEW_LINE)
+						.append("ReportingForReleaseCycle: ")
+						.append(run.getReleaseDate())
+						.append(NEW_LINE)
+						.append(NEW_LINE);
 			}
-			reportSummary.append("Total assertions failed:" + run.getFailedAssertions().size());
-			reportSummary.append(NEW_LINE);
+			reportSummary.append(run.getValidationView() == ValidationView.STATED ? "Results on stated view: " : "Results on inferred view: ")
+					.append(NEW_LINE)
+					.append("\tTotal MRCM domains loaded: ")
+					.append(run.getMRCMDomains().size())
+					.append(NEW_LINE)
+					.append("\tTotal MRCM attributes loaded: ")
+					.append(totalAttribute)
+					.append(NEW_LINE)
+					.append("\tTotal assertions completed: ")
+					.append(run.getCompletedAssertions().size())
+					.append(NEW_LINE);
+			if (run.reportSkippedAssertions()) {
+				reportSummary.append("\tTotal assertions skipped: ")
+						.append(run.getSkippedAssertions().size())
+						.append(NEW_LINE);
+			}
+			reportSummary.append("\tTotal assertions failed: ").append(run.getFailedAssertions().size())
+					.append(NEW_LINE)
+					.append(NEW_LINE);
 			writer.write(reportSummary.toString());
 		}
 	}
 
-	private StringBuilder extractInstances(List<Long> failed) {
-		StringBuilder conceptList = new StringBuilder();
-		for (int i=0; i < failed.size(); i++) {
+	private String extractInstances(final List<Long> failed) {
+		final StringBuilder conceptList = new StringBuilder();
+		IntStream.range(0, failed.size()).forEach(i -> {
 			if (i > 0) {
 				conceptList.append(",");
 			}
 			conceptList.append(failed.get(i));
-		}
-		return conceptList;
+		});
+		return conceptList.toString();
 	}
 }
