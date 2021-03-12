@@ -66,7 +66,7 @@ public class ValidationService {
 	}
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
-		LoadingProfile profile = run.getValidationView() == ValidationView.STATED ?
+		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
 				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
 				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
 				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()

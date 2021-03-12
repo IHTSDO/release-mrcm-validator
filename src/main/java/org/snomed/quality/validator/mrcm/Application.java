@@ -2,8 +2,6 @@ package org.snomed.quality.validator.mrcm;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,15 +15,13 @@ import static org.snomed.quality.validator.mrcm.Constants.*;
 
 public class Application {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(Application.class);
-
 	public static void main(final String[] args) throws Exception {
 		if (args == null || args.length < 4) {
-			LOGGER.info(ERROR_MESSAGE);
-			LOGGER.info(RELEASE_PACKAGE_UNZIPPED_ROOT_DIR_HELP_MESSAGE);
-			LOGGER.info(IS_STATED_ONLY_HELP_MESSAGE);
-			LOGGER.info(RELEASE_DATE_HELP_MESSAGE);
-			LOGGER.info(RESULT_DIR_HELP_MESSAGE);
+			System.out.println(ERROR_MESSAGE);
+			System.out.println(RELEASE_PACKAGE_UNZIPPED_ROOT_DIR_HELP_MESSAGE);
+			System.out.println(CONTENT_TYPE_HELP_MESSAGE);
+			System.out.println(RELEASE_DATE_HELP_MESSAGE);
+			System.out.println(RESULT_DIR_HELP_MESSAGE);
 			throw new IllegalStateException(ERROR_MESSAGE);
 		} else {
 			final String releaseDate = args[2];
@@ -36,22 +32,22 @@ public class Application {
 			if (!resultDir.exists() && !resultDir.mkdirs()) {
 				throw new NotDirectoryException("Result directory '" + resultDir + "' failed to be created automatically.");
 			}
-			new Application().run(args[0], releaseDate, getValidationViews(args), resultDir);
+			new Application().run(args[0], releaseDate, getContentTypes(args), resultDir);
 		}
 	}
 
-	private static List<ValidationView> getValidationViews(final String[] args) {
-		final String validationViews = args[1];
-		return validationViews != null && validationViews.length() != 0 ? ValidationView.getValidationViews((validationViews.contains(",") ?
-				Arrays.asList(validationViews.split(",")) : Collections.singletonList(validationViews))) :
-				Collections.emptyList();
+	private static List<ContentType> getContentTypes(final String[] args) {
+		final String contentTypesArg = args[1];
+		return contentTypesArg != null && contentTypesArg.length() != 0 ? ContentType.getContentTypes((contentTypesArg.contains(",") ?
+				Arrays.asList(contentTypesArg.split(",")) : Collections.singletonList(contentTypesArg))) :
+				Collections.singletonList(ContentType.STATED);
 	}
 
-	private void run(String releasePackage, final String releaseDate, final List<ValidationView> validationViews,
+	private void run(String releasePackage, final String releaseDate, final List<ContentType> contentTypes,
 			final File resultDir) throws ReleaseImportException, IOException, ServiceException {
-		for (final ValidationView validationView : validationViews) {
+		for (final ContentType contentType : contentTypes) {
 			final ValidationService service = new ValidationService();
-			final ValidationRun run = new ValidationRun(releaseDate, validationView, true);
+			final ValidationRun run = new ValidationRun(releaseDate, contentType, true);
 			if (releasePackage == null) {
 				// No external package specified, using default soft link release path.
 				releasePackage = "release";

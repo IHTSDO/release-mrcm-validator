@@ -14,16 +14,16 @@ public final class ValidationRun {
 	private final List<Assertion> assertionsCompleted;
 	private final List<Assertion> assertionSkipped;
 	private final String releaseDate;
-	private final ValidationView validationView;
+	private final ContentType contentType;
 	private Set<Long> ungroupedAttributes;
 	private final boolean reportSkippedAssertions;
 
-	public ValidationRun(final String releaseDate, final ValidationView validationView, final boolean reportSkippedAssertions) {
+	public ValidationRun(final String releaseDate, final ContentType contentType, final boolean reportSkippedAssertions) {
 		assertionsCompleted = new ArrayList<>();
 		validationTypes = Arrays.asList(ValidationType.values());
 		assertionSkipped = new ArrayList<>();
 		this.releaseDate = releaseDate;
-		this.validationView = validationView;
+		this.contentType = contentType;
 		ungroupedAttributes = new HashSet<>();
 		this.reportSkippedAssertions = reportSkippedAssertions;
 	}
@@ -82,8 +82,8 @@ public final class ValidationRun {
 		return releaseDate;
 	}
 
-	public final ValidationView getValidationView() {
-		return validationView;
+	public final ContentType getContentType() {
+		return contentType;
 	}
 
 	public final void setUngroupedAttributes(final Set<Long> ungroupedAttributes) {
@@ -110,13 +110,13 @@ public final class ValidationRun {
 				Objects.equals(assertionsCompleted, that.assertionsCompleted) &&
 				Objects.equals(assertionSkipped, that.assertionSkipped) &&
 				Objects.equals(releaseDate, that.releaseDate) &&
-				validationView == that.validationView &&
+				contentType == that.contentType &&
 				Objects.equals(ungroupedAttributes, that.ungroupedAttributes);
 	}
 
 	@Override
 	public final int hashCode() {
 		return Objects.hash(validationTypes, mrcmDomains, attributeRangesMap, assertionsCompleted, assertionSkipped,
-				releaseDate, validationView, ungroupedAttributes, reportSkippedAssertions);
+				releaseDate, contentType, ungroupedAttributes, reportSkippedAssertions);
 	}
 }
