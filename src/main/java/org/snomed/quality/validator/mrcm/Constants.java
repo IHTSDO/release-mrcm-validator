@@ -6,7 +6,7 @@ public final class Constants {
 
 	public static final String RELEASE_PACKAGE_UNZIPPED_ROOT_DIR_HELP_MESSAGE = "{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z";
 
-	public static final String CONTENT_TYPE_HELP_MESSAGE = "{content_type} is used to specify whether to use stated, inferred or both (stated & inferred) relationships. " +
+	public static final String CONTENT_TYPE_HELP_MESSAGE = "{content_type} is used to specify whether to use stated, inferred or both relationships (this is the expected arguments: stated, inferred or stated,inferred (which is used to specify running both sequentially)). " +
 			"This parameter is optional and the default content type is stated.";
 
 	public static final String RELEASE_DATE_HELP_MESSAGE = "{release_date} is the effective date for the release file that is being validated.The format is yyyyMMdd eg:20170731";
@@ -40,15 +40,15 @@ public final class Constants {
 
 	public static final String REPORT_SUMMARY_RESULTS_ON_INFERRED_VIEW_LINE = "Results on inferred view: ";
 
-	public static final String REPORT_SUMMARY_TOTAL_MRCM_DOMAINS_LOADED_LINE = "\tTotal " + MRCM_TITLE_PREFIX + " domains loaded: ";
+	public static final String REPORT_SUMMARY_TOTAL_MRCM_DOMAINS_LOADED_LINE = "Total " + MRCM_TITLE_PREFIX + " domains loaded: ";
 
-	public static final String REPORT_SUMMARY_TOTAL_MRCM_ATTRIBUTES_LOADED_LINE = "\tTotal " + MRCM_TITLE_PREFIX + " attributes loaded: ";
+	public static final String REPORT_SUMMARY_TOTAL_MRCM_ATTRIBUTES_LOADED_LINE = "Total " + MRCM_TITLE_PREFIX + " attributes loaded: ";
 
-	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_COMPLETED_LINE = "\tTotal assertions completed: ";
+	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_COMPLETED_LINE = "Total assertions completed: ";
 
-	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_SKIPPED_LINE = "\tTotal assertions skipped: ";
+	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_SKIPPED_LINE = "Total assertions skipped: ";
 
-	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_FAILED_LINE = "\tTotal assertions failed: ";
+	public static final String REPORT_SUMMARY_TOTAL_ASSERTIONS_FAILED_LINE = "Total assertions failed: ";
 
 	public static final String TAB = "\t";
 

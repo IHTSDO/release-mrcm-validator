@@ -94,21 +94,26 @@ public class ReportService {
 			reportSummary.append(run.getContentType() == ContentType.STATED ? REPORT_SUMMARY_RESULTS_ON_STATED_VIEW_LINE :
 					REPORT_SUMMARY_RESULTS_ON_INFERRED_VIEW_LINE)
 					.append(NEW_LINE)
+					.append(TAB)
 					.append(REPORT_SUMMARY_TOTAL_MRCM_DOMAINS_LOADED_LINE)
 					.append(run.getMRCMDomains().size())
 					.append(NEW_LINE)
+					.append(TAB)
 					.append(REPORT_SUMMARY_TOTAL_MRCM_ATTRIBUTES_LOADED_LINE)
 					.append(totalAttribute)
 					.append(NEW_LINE)
+					.append(TAB)
 					.append(REPORT_SUMMARY_TOTAL_ASSERTIONS_COMPLETED_LINE)
 					.append(run.getCompletedAssertions().size())
 					.append(NEW_LINE);
 			if (run.reportSkippedAssertions()) {
-				reportSummary.append(REPORT_SUMMARY_TOTAL_ASSERTIONS_SKIPPED_LINE)
+				reportSummary.append(TAB)
+						.append(REPORT_SUMMARY_TOTAL_ASSERTIONS_SKIPPED_LINE)
 						.append(run.getSkippedAssertions().size())
 						.append(NEW_LINE);
 			}
-			reportSummary.append(REPORT_SUMMARY_TOTAL_ASSERTIONS_FAILED_LINE)
+			reportSummary.append(TAB)
+					.append(REPORT_SUMMARY_TOTAL_ASSERTIONS_FAILED_LINE)
 					.append(run.getFailedAssertions().size())
 					.append(NEW_LINE)
 					.append(NEW_LINE);
