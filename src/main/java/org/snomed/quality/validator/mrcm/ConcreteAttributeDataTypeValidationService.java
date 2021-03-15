@@ -20,7 +20,7 @@ import java.util.*;
 public class ConcreteAttributeDataTypeValidationService {
 
 	public void validate(File file, ValidationRun run) throws ReleaseImportException {
-		LoadingProfile profile = run.isStatedView() ?
+		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
 				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
 						.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
 				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()
@@ -42,7 +42,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		releaseImporter.loadSnapshotReleaseFiles(file.getAbsolutePath(), profile, componentFactory);
 
 		// Add assertions for all concrete attributes defined in the MRCM
-		attributeRangeMap.values().stream().forEach(attribute -> {
+		attributeRangeMap.values().forEach(attribute -> {
 			Assertion assertion = null;
 			if (componentFactory.getAttributeToViolatedConceptsMap().containsKey(attribute.getAttributeId())) {
 				List<Long> conceptIds = new ArrayList<>(componentFactory.getAttributeToViolatedConceptsMap().get(attribute.getAttributeId()));

@@ -1,59 +1,60 @@
 package org.snomed.quality.validator.mrcm;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Collections;
-
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.NotDirectoryException;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.snomed.quality.validator.mrcm.Constants.*;
 
 public class Application {
 
-	private static final Logger LOGGER = LoggerFactory.getLogger(Application.class);
-	
-	public static void main(String[] args) throws Exception {
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd");
-		String releasePackage = null;
-		String releaseDate = null;
-		File resultDir = null;
-		boolean isStatedViewOnly = true;
-		if ( args == null || args.length < 4) {
-			String msg = "Please specify the java arguments after replacing the {} with actual values." + "{release_package_unzipped_root} {is_stated_only} {release_date} {result_dir}";
-			System.out.println(msg);
-			System.out.println("{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z");
-			System.out.println("{is_stated_only} is to state whether to use stated relationships only. This parameter is optional and the default value is set to true.");
-			System.out.println("{release_date} is the effective date for the release file that is being validated.The format is yyyyMMdd eg:20170731");
-			System.out.println("{result_dir} is the directory where validation reports will be saved.");
-			throw new IllegalStateException(msg);
+	public static void main(final String[] args) throws Exception {
+		if (args == null || args.length < 4) {
+			System.out.println(ERROR_MESSAGE);
+			System.out.println(RELEASE_PACKAGE_UNZIPPED_ROOT_DIR_HELP_MESSAGE);
+			System.out.println(CONTENT_TYPE_HELP_MESSAGE);
+			System.out.println(RELEASE_DATE_HELP_MESSAGE);
+			System.out.println(RESULT_DIR_HELP_MESSAGE);
+			throw new IllegalStateException(ERROR_MESSAGE);
 		} else {
-			releasePackage = args[0];
-			isStatedViewOnly =  Boolean.parseBoolean(args[1]);
-			releaseDate = args[2];
+			final String releaseDate = args[2];
 			if (releaseDate != null) {
-				dateFormat.parse(releaseDate);
+				new SimpleDateFormat("yyyyMMdd").parse(releaseDate);
 			} 
-			resultDir = new File (args[3]);
-			if (!resultDir.exists()) {
-				resultDir.mkdirs();
+			final File resultDir = new File(args[3]);
+			if (!resultDir.exists() && !resultDir.mkdirs()) {
+				throw new NotDirectoryException("Result directory '" + resultDir + "' failed to be created automatically.");
 			}
-			new Application().run(releasePackage, releaseDate, isStatedViewOnly, resultDir);
+			new Application().run(args[0], releaseDate, getContentTypes(args), resultDir);
 		}
 	}
 
-	private void run(String releasePackage, String releaseDate, boolean isStatedViewOnly, File resultDir) throws ReleaseImportException, IOException, ServiceException {
-		ValidationService service = new ValidationService();
-		ValidationRun run = new ValidationRun(releaseDate, isStatedViewOnly, true);
-		if (releasePackage == null) {
-			//no external package specified using default soft link release path.
-			releasePackage = "release";
-			releaseDate = "20180131";
+	private static List<ContentType> getContentTypes(final String[] args) {
+		final String contentTypesArg = args[1];
+		return contentTypesArg != null && contentTypesArg.length() != 0 ? ContentType.getContentTypes((contentTypesArg.contains(",") ?
+				Arrays.asList(contentTypesArg.split(",")) : Collections.singletonList(contentTypesArg))) :
+				Collections.singletonList(ContentType.STATED);
+	}
+
+	private void run(String releasePackage, final String releaseDate, final List<ContentType> contentTypes,
+			final File resultDir) throws ReleaseImportException, IOException, ServiceException {
+		for (final ContentType contentType : contentTypes) {
+			final ValidationService service = new ValidationService();
+			final ValidationRun run = new ValidationRun(releaseDate, contentType, true);
+			if (releasePackage == null) {
+				// No external package specified, using default soft link release path.
+				releasePackage = "release";
+			}
+			service.loadMRCM(new File(releasePackage), run);
+			service.validateRelease(new File(releasePackage), run);
+			new ReportService(resultDir, releasePackage).generateValidationReports(run);
 		}
-		service.loadMRCM(new File(releasePackage), run);
-		service.validateRelease(new File(releasePackage), run);
-		ReportService reportService = new ReportService(resultDir, releasePackage);
-		reportService.generateValidationReports(run);
 	}
 }
