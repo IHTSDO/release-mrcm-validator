@@ -6,8 +6,7 @@ public final class Constants {
 
 	public static final String RELEASE_PACKAGE_UNZIPPED_ROOT_DIR_HELP_MESSAGE = "{release_package_unzipped_root_dir} is for the release package unzipped file root directory. eg: /Users/Releases/SnomedCT_InternationalRF2_PRODUCTION_20170731T120000Z";
 
-	public static final String CONTENT_TYPE_HELP_MESSAGE = "{content_type} is used to specify whether to use stated, inferred or both relationships (this is the expected arguments: stated, inferred or stated,inferred (which is used to specify running both sequentially)). " +
-			"This parameter is optional and the default content type is stated.";
+	public static final String CONTENT_TYPE_HELP_MESSAGE = "{content_type} is used to specify whether to validate against stated, inferred or both. (Note: Use comma to separate multiple type e.g stated,inferred).";
 
 	public static final String RELEASE_DATE_HELP_MESSAGE = "{release_date} is the effective date for the release file that is being validated.The format is yyyyMMdd eg:20170731";
 
@@ -75,6 +74,8 @@ public final class Constants {
 	public static final String ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT = "723593002";
 
 	public static final String NO_DATA_TYPE_DEFINED_ASSERTION_UUID = "ebc49f5b-2810-4502-b67f-0f6876d82a3c";
+
+	public static final String RELEASE_DATE_FORMAT = "yyyyMMdd";
 
 	private Constants() {
 	}

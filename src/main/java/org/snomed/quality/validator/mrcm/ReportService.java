@@ -1,5 +1,7 @@
 package org.snomed.quality.validator.mrcm;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -36,7 +38,7 @@ public class ReportService {
 	private void createSuccessfulValidationReport(final File resultDir, final ValidationRun run) throws IOException {
 		if (!run.getCompletedAssertions().isEmpty()) {
 			try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir,
-					MRCM_TITLE_PREFIX + run.getContentType().getType() + VALIDATION_PASSED_FILE_NAME_WITH_TXT_EXTENSION)))) {
+					MRCM_TITLE_PREFIX + StringUtils.capitalize(run.getContentType().getType()) + VALIDATION_PASSED_FILE_NAME_WITH_TXT_EXTENSION)))) {
 				for (Assertion passed : run.getCompletedAssertions()) {
 					writer.write(passed.toString());
 					writer.write(NEW_LINE);
@@ -49,7 +51,7 @@ public class ReportService {
 		// Report skipped assertions and reasons
 		if (run.reportSkippedAssertions() && !run.getSkippedAssertions().isEmpty()) {
 			try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir,
-					MRCM_TITLE_PREFIX + run.getContentType().getType() + VALIDATION_SKIPPED_FILE_NAME_WITH_TXT_EXTENSION)))) {
+					MRCM_TITLE_PREFIX + StringUtils.capitalize(run.getContentType().getType()) + VALIDATION_SKIPPED_FILE_NAME_WITH_TXT_EXTENSION)))) {
 				for (Assertion skipped : run.getSkippedAssertions()) {
 					writer.write(skipped.toString());
 					writer.write(NEW_LINE);
@@ -60,9 +62,7 @@ public class ReportService {
 
 	private void createValidationFailureReport(final File resultDir, final ValidationRun run, final Set<Assertion> failures,
 			final boolean isErrorReporting) throws IOException {
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir, MRCM_TITLE_PREFIX +
-				run.getContentType().getType() + VALIDATION_REPORT_PREFIX + (isErrorReporting ? WITH_ERROR : WITH_WARNING) +
-				TXT_EXTENSION)))) {
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(resultDir, constructFailureReportFilename(run.getContentType(), isErrorReporting))))) {
 			writer.write(VALIDATION_REPORT_HEADINGS);
 			writer.write(NEW_LINE);
 			int counter = 1;
@@ -73,6 +73,11 @@ public class ReportService {
 						TAB + extractInstances(failed.getPreviousViolatedConceptIds()) + NEW_LINE);
 			}
 		}
+	}
+
+	private String constructFailureReportFilename(ContentType contentType, boolean isErrorReporting) {
+		return MRCM_TITLE_PREFIX + StringUtils.capitalize(contentType.getType()) + VALIDATION_REPORT_PREFIX + (isErrorReporting ? WITH_ERROR : WITH_WARNING) +
+				TXT_EXTENSION;
 	}
 
 	private void createSummaryReport(final File resultDir, final String releasePackage, final ValidationRun run) throws IOException {

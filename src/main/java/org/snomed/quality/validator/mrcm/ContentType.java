@@ -4,8 +4,8 @@ import java.util.*;
 
 public enum ContentType {
 
-	STATED("Stated"),
-	INFERRED("Inferred");
+	STATED("stated"),
+	INFERRED("inferred");
 
 	private final String type;
 
