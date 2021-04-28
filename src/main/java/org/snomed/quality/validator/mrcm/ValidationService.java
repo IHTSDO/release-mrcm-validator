@@ -1,14 +1,21 @@
 package org.snomed.quality.validator.mrcm;
 
 import com.google.common.base.Strings;
+import it.unimi.dsi.fastutil.longs.Long2ObjectArrayMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import org.apache.commons.lang3.StringUtils;
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.snomedboot.ReleaseImporter;
 import org.ihtsdo.otf.snomedboot.domain.Concept;
 import org.ihtsdo.otf.snomedboot.domain.ConceptConstants;
+import org.ihtsdo.otf.snomedboot.domain.Description;
+import org.ihtsdo.otf.snomedboot.factory.FactoryUtils;
 import org.ihtsdo.otf.snomedboot.factory.ImpotentComponentFactory;
 import org.ihtsdo.otf.snomedboot.factory.LoadingProfile;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentFactoryImpl;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStore;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ConceptImpl;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.DescriptionImpl;
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
@@ -33,6 +40,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.lang.Long.parseLong;
 import static org.snomed.quality.validator.mrcm.Constants.*;
@@ -40,6 +48,8 @@ import static org.snomed.quality.validator.mrcm.Constants.*;
 public class ValidationService {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValidationService.class);
+
+	private static final Pattern CONCEPT_TERM_PATTERN = Pattern.compile("\\d+\\s\\|(.*?)\\|");
 
 	private static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
@@ -55,6 +65,7 @@ public class ValidationService {
 		run.setMRCMDomains(domains);
 		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
 		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
+		run.setInUseConceptIds(mrcmFactory.getInUseConceptIds());
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
@@ -67,14 +78,17 @@ public class ValidationService {
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
 		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
-				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
+				LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
 				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
-				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()
+				: LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects()
 				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
-		OWLExpressionFactory owlExpressionFactory = new OWLExpressionFactory(new ComponentStore(), run.getUngroupedAttributes());
-		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionFactory);
+		OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory = new OWLExpressionAndDescriptionFactory(new ComponentStore(), run.getUngroupedAttributes(), run.getInUseConceptIds());
+		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionAndDescriptionFactory);
 		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
+
+		final Long2ObjectMap<List<DescriptionImpl>> descriptions = owlExpressionAndDescriptionFactory.getDescriptions();
+		LOGGER.info("Total in-use concepts in attribute range {}", descriptions.keySet().size());
 
 		//checking data is loaded properly
 		LOGGER.info("Total concepts loaded {}", queryService.getConceptCount());
@@ -86,7 +100,7 @@ public class ValidationService {
 					executeAttributeDomainValidation(run, queryService, preCoordinatedTypes, modules);
 					break;
 				case ATTRIBUTE_RANGE :
-					executeAttributeRangeValidation(run, queryService, preCoordinatedTypes, modules);
+					executeAttributeRangeValidation(run, queryService, descriptions, preCoordinatedTypes, modules);
 					break;
 				case ATTRIBUTE_CARDINALITY :
 					executeAttributeCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
@@ -255,10 +269,10 @@ public class ValidationService {
 		}
 		return new Assertion(attribute, validationType, msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
 	}
-	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
+	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Long2ObjectMap<List<DescriptionImpl>> descriptions, List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
 		Set<String> validationCompleted = new HashSet<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
-			runAttributeRangeValidation(run, queryService, domain, precoordinatedTypes, validationCompleted, modules);
+			runAttributeRangeValidation(run, queryService, descriptions, domain, precoordinatedTypes, validationCompleted, modules);
 		}
 	}
 
@@ -412,7 +426,7 @@ public class ValidationService {
 		return false;
 	}
 
-	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
+	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Long2ObjectMap<List<DescriptionImpl>> descriptions, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
 				LOGGER.error("No range constraint found with attribute id {} for domain {}.", attribute.getAttributeId(), domain.getDomainId());
@@ -431,6 +445,10 @@ public class ValidationService {
 				if (Strings.isNullOrEmpty(rangeConstraint) || Strings.isNullOrEmpty(attributeRange.getRangeRule())) {
 					throw new IllegalStateException("No attribute range constraint or rule is defined in attribute range " +  attributeRange);
 				}
+
+				validateConceptsInRange(run, descriptions, queryService, attributeRange, "range constraint", attributeRange.getRangeConstraint());
+				validateConceptsInRange(run, descriptions, queryService, attributeRange, "range rule", attributeRange.getRangeRule());
+
 				if (precoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
 					String outOfRangeRule = null;
 					// check concrete attribute range constraint
@@ -453,6 +471,76 @@ public class ValidationService {
 					run.addSkippedAssertion(constructAssertion(queryService, attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
 				}
 			}
+		}
+	}
+
+	private void validateConceptsInRange(ValidationRun run, Long2ObjectMap<List<DescriptionImpl>> descriptions, SnomedQueryService queryService, Attribute attribute, String column, String range) throws ServiceException {
+		List<ConceptImpl> concepts = getConceptsFromRange(range);
+		Set<ConceptImpl> notFoundConcepts = new HashSet<>();
+		List<ConceptImpl> inactiveConcepts = new ArrayList<>();
+		List<ConceptImpl> invalidTermConcepts = new ArrayList<>();
+		concepts.forEach(concept -> {
+			ConceptResult existingConcept;
+			try {
+				existingConcept = queryService.retrieveConcept(concept.getId().toString());
+			} catch (ServiceException e) {
+				existingConcept = null;
+				LOGGER.error("Error while retrieving concept details for concept {}", concept.getId());
+			}
+			if (existingConcept == null) {
+				ConceptImpl foundConcept = notFoundConcepts.stream().filter(c -> concept.getId().equals(c.getId())).findAny().orElse(null);
+				if (foundConcept == null) {
+					inactiveConcepts.add(concept);
+				}
+				notFoundConcepts.add(concept);
+			} else if (!existingConcept.isActive()) {
+				ConceptImpl foundConcept = inactiveConcepts.stream().filter(c -> concept.getId().equals(c.getId())).findAny().orElse(null);
+				if (foundConcept == null) {
+					inactiveConcepts.add(concept);
+				}
+			} else {
+				boolean termMatched = false;
+				List<DescriptionImpl> descriptionList = descriptions.get(concept.getId());
+				for (Description description : descriptionList) {
+					if (description.isActive() && description.getTerm().equals(concept.getFsn())) {
+						termMatched = true;
+						break;
+					}
+				}
+				if (!termMatched) {
+					ConceptImpl foundConcept = invalidTermConcepts.stream().filter(c -> concept.getId().equals(c.getId())).findAny().orElse(null);
+					if (foundConcept == null) {
+						invalidTermConcepts.add(concept);
+					}
+				}
+			}
+		});
+
+		Assertion assertion;
+		String msg;
+		if (notFoundConcepts.size() != 0) {
+			List<ConceptResult> currentViolatedConcepts = notFoundConcepts.stream()
+					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
+					.collect(Collectors.toList());
+			msg = String.format("The concepts which are using in %s for attribute range id %s do not exist", column, attribute.getUuid().toString());
+			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
+			run.addCompletedAssertion(assertion);
+		}
+		if (inactiveConcepts.size() != 0) {
+			List<ConceptResult> currentViolatedConcepts = inactiveConcepts.stream()
+					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
+					.collect(Collectors.toList());
+			msg = String.format("The concepts which are using in %s for attribute range id %s are inactive", column, attribute.getUuid().toString());
+			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
+			run.addCompletedAssertion(assertion);
+		}
+		if (invalidTermConcepts.size() != 0) {
+			List<ConceptResult> currentViolatedConcepts = invalidTermConcepts.stream()
+					.map(concept -> new ConceptResult(concept.getId().toString(), null, "1", null, null, concept.getFsn(), null))
+					.collect(Collectors.toList());
+			msg = String.format("The terms which are using in %s for attribute range id %s are invalid", column, attribute.getUuid().toString());
+			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
+			run.addCompletedAssertion(assertion);
 		}
 	}
 
@@ -540,6 +628,24 @@ public class ValidationService {
 		return builder.toString();
 	}
 
+	private static List<ConceptImpl> getConceptsFromRange(String range) {
+		if (StringUtils.isEmpty(range)) {
+			return Collections.emptyList();
+		}
+
+		List<ConceptImpl> concepts = new ArrayList<>();
+		Matcher matcher = CONCEPT_TERM_PATTERN.matcher(range);
+		while (matcher.find()) {
+			String parts[] = matcher.group().split(" ", 2);
+			String conceptId = parts[0].trim();
+			String term = parts[1].trim().substring(1, parts[1].trim().length() -1);
+			ConceptImpl concept = new ConceptImpl(conceptId);
+			concept.setFsn(term);
+			concepts.add(concept);
+		}
+		return concepts;
+	}
+
 	private class MRCMFactory extends ImpotentComponentFactory {
 
 		private static final int domDomainConstraintIndex = 0;
@@ -553,6 +659,7 @@ public class ValidationService {
 		private Map<String, Domain> domains = new HashMap<>();
 		private Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
 		private Set<Long> ungroupedAttributes = new HashSet<>();
+		private Set<Long> inUseConceptIds = new HashSet<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
@@ -571,7 +678,9 @@ public class ValidationService {
 							loadUngroupedAttributes(active, referencedComponentId, otherValues);
 							break;
 						case MRCM_ATTRIBUTE_RANGE_REFSET:
-							createAttributeRange(id, referencedComponentId, otherValues);
+							Attribute attributeRange =createAttributeRange(id, referencedComponentId, otherValues);
+							addInUseConceptIds(attributeRange.getRangeRule());
+							addInUseConceptIds(attributeRange.getRangeConstraint());
 							break;
 						default:
 							LOGGER.error("Invalid refsetId:" + refsetId);
@@ -666,19 +775,34 @@ public class ValidationService {
 				}
 			}
 		}
+
+		private void addInUseConceptIds(String range) {
+			List<ConceptImpl> concepts = getConceptsFromRange(range);
+			concepts.forEach(concept -> {
+				this.inUseConceptIds.add(concept.getId());
+			});
+		}
+
+		public Set<Long> getInUseConceptIds() {
+			return this.inUseConceptIds;
+		}
 	}
 
-	private class OWLExpressionFactory extends ComponentFactoryImpl {
+	private class OWLExpressionAndDescriptionFactory extends ComponentFactoryImpl {
 
 		private static final String OWL_AXIOM_REFSET = "733073007";
 		private final AxiomRelationshipConversionService axiomConverter;
 		private final Logger logger = LoggerFactory.getLogger(getClass());
 		private final ComponentStore componentStore;
+		private final Set<Long> inUseConceptIds;
+		private Long2ObjectMap<List<DescriptionImpl>> descriptions;
 
-		public OWLExpressionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes) {
+		public OWLExpressionAndDescriptionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes, Set<Long> inUseConceptIds) {
 			super(componentStore);
 			this.componentStore = componentStore;
-			axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
+			this.axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
+			this.inUseConceptIds = inUseConceptIds;
+			this.descriptions = new Long2ObjectArrayMap<>();
 		}
 
 		@Override
@@ -704,6 +828,24 @@ public class ValidationService {
 					}
 				}
 			}
+		}
+
+		@Override
+		public void newDescriptionState(String id, String effectiveTime, String active, String moduleId, String conceptId, String languageCode, String typeId, String term, String caseSignificanceId) {
+			if (inUseConceptIds.contains(Long.parseLong(conceptId))) {
+				DescriptionImpl description = new DescriptionImpl(id, FactoryUtils.parseActive(active), term, conceptId);
+				if (descriptions.containsKey(Long.valueOf(conceptId))) {
+					descriptions.get(Long.valueOf(conceptId)).add(description);
+				} else {
+					List<DescriptionImpl> newDescriptions = new ArrayList<>();
+					newDescriptions.add(description);
+					descriptions.put(Long.valueOf(conceptId), newDescriptions);
+				}
+			}
+		}
+
+		public Long2ObjectMap<List<DescriptionImpl>> getDescriptions() {
+			return this.descriptions;
 		}
 
 		private void addRelationships(String axiomId, Long namedConcept, Map<Integer, List<Relationship>> groups, String moduleId, String effectiveTime) {
@@ -737,11 +879,11 @@ public class ValidationService {
 			releaseImporter = new ReleaseImporter();
 		}
 
-		public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+		public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
 			return loadReleaseFiledToStore(releaseDirectory, loadingProfile, new RamReleaseStore(), componentFactory);
 		}
 
-		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionFactory componentFactory) throws ReleaseImportException, IOException {
+		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
 			releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory);
 			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
 			return writeToIndex(conceptMap, releaseStore, loadingProfile);

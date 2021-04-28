@@ -31,6 +31,7 @@ public class Assertion {
 	private List<ConceptResult> previousViolatedConcepts;
 	private final String message;
 	private ValidationType validationType;
+	private ValidationSubType validationSubType;
 	private FailureType failureType;
 	private String domainConstraint;
 	
@@ -53,6 +54,16 @@ public class Assertion {
 	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType,
 					  List<ConceptResult> currentViolatedConcepts, List<ConceptResult> previousViolatedConcepts, String domainConstraint) {
 		this(attribute, type, msg, failureType, currentViolatedConcepts == null ? new ArrayList<>() : currentViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList()));
+		this.previousViolatedConceptIds = previousViolatedConcepts == null ? new ArrayList<>() : previousViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList());
+		this.domainConstraint = domainConstraint;
+		this.currentViolatedConcepts = currentViolatedConcepts;
+		this.previousViolatedConcepts = previousViolatedConcepts == null ? new ArrayList<>() : previousViolatedConcepts;
+	}
+
+	public Assertion(Attribute attribute, ValidationType type, ValidationSubType subType, String msg, FailureType failureType,
+					 List<ConceptResult> currentViolatedConcepts, List<ConceptResult> previousViolatedConcepts, String domainConstraint) {
+		this(attribute, type, msg, failureType, currentViolatedConcepts == null ? new ArrayList<>() : currentViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList()));
+		this.validationSubType = subType;
 		this.previousViolatedConceptIds = previousViolatedConcepts == null ? new ArrayList<>() : previousViolatedConcepts.stream().map(ConceptResult::getId).map(Long::parseLong).collect(Collectors.toList());
 		this.domainConstraint = domainConstraint;
 		this.currentViolatedConcepts = currentViolatedConcepts;
@@ -105,7 +116,13 @@ public class Assertion {
 		} else if (ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeInGroupCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
-			assertionText += " " + attribute.getRangeConstraint();
+			if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
+				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
+				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType) {
+				assertionText = getMessage();
+			} else {
+				assertionText += " " + attribute.getRangeConstraint();
+			}
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
 			assertionText += domainConstraint != null ? (" " + domainConstraint) : " ";
 		}
@@ -127,7 +144,15 @@ public class Assertion {
 					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
 					getFailureCardinalityMessage(attribute.getAttributeInGroupCardinality()));
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
-			detail += " " + attribute.getRangeConstraint();
+			if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType) {
+				detail = "The concept is inactive";
+			} else if (ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType) {
+				detail = "The concept doest not exist";
+			} else if (ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType) {
+				detail = "The term is invalid";
+			} else {
+				detail += " " + attribute.getRangeConstraint();
+			}
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
 			detail +=  domainConstraint != null ? domainConstraint : " ";
 		}

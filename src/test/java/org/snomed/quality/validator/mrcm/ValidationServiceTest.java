@@ -59,7 +59,7 @@ public class ValidationServiceTest {
 	public void testValidationForAll() throws Exception {
 		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(267, run.getCompletedAssertions().size());
+		assertEquals(271, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		final List<String> failedMessages = Arrays.asList(
 				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute cardinality [0..1]",
@@ -74,9 +74,14 @@ public class ValidationServiceTest {
 				"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
-				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|"
+				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|",
+				"The terms which are using in range constraint for attribute range id 7d23e837-4e2b-45cd-b5c8-8ea9b51daae0 were invalid terms",
+				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid",
+				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid",
+				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid"
 				);
 		assertEquals(failedMessages.size(), run.getFailedAssertions().size());
+		Set<Assertion> test = run.getFailedAssertions();
 		List<String> failedAssertions = run.getFailedAssertions().stream().map(assertion -> assertion.getAssertionText()).collect(Collectors.toList());
 		Collections.sort(failedAssertions);
 //		failedAssertions.stream().forEach(System.out::println);
@@ -146,21 +151,24 @@ public class ValidationServiceTest {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_RANGE));
 		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(88, run.getCompletedAssertions().size());
+		assertEquals(92, run.getCompletedAssertions().size());
 		//skipped assertions
 		assertEquals(0, run.getSkippedAssertions().size());
-		assertEquals(4, run.getFailedAssertions().size());
-		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "3311482006", "3311482007");
+		assertEquals(8, run.getFailedAssertions().size());
+		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "3311482006", "3311482007", "363702006");
 		for (Assertion assertion : run.getFailedAssertions()) {
 			assertTrue(expectedFailed.contains(assertion.getAttribute().getAttributeId()));
 			if ("363698007".equals(assertion.getAttribute().getAttributeId())) {
 				assertEquals("<< 442083009 |Anatomical or acquired body structure (body structure)|", assertion.getAttribute().getRangeConstraint());
 				assertTrue(assertion.getCurrentViolatedConceptIds().contains(29857009L));
 			}
-			if ("3311482005".equals(assertion.getAttribute().getAttributeId()) || "3311482006".equals(assertion.getAttribute().getAttributeId())
-					|| "3311482007".equals(assertion.getAttribute().getAttributeId())) {
+			if ("3311482005".equals(assertion.getAttribute().getAttributeId())) {
 				assertEquals(1, assertion.getCurrentViolatedConceptIds().size());
-				assertTrue(assertion.getCurrentViolatedConceptIds().contains(375745003L));
+				assertTrue(assertion.getCurrentViolatedConceptIds().contains(375745003L) || assertion.getCurrentViolatedConceptIds().contains(3311482005L));
+
+				if (assertion.getCurrentViolatedConceptIds().contains(3311482005L)) {
+					assertEquals("The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid", assertion.getMessage());
+				}
 			}
 		}
 	}
