@@ -39,7 +39,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		ReleaseImporter releaseImporter = new ReleaseImporter();
 		AxiomRelationshipConversionService conversionService = new AxiomRelationshipConversionService(run.getUngroupedAttributes());
 		DataTypeValidationComponentFactory componentFactory = new DataTypeValidationComponentFactory(concreteAttributeDataTypeMap, conversionService);
-		releaseImporter.loadSnapshotReleaseFiles(file.getAbsolutePath(), profile, componentFactory);
+		releaseImporter.loadSnapshotReleaseFiles(file.getAbsolutePath(), profile, componentFactory, true);
 
 		// Add assertions for all concrete attributes defined in the MRCM
 		attributeRangeMap.values().forEach(attribute -> {

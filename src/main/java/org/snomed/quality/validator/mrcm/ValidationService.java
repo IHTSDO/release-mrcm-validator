@@ -58,7 +58,7 @@ public class ValidationService {
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
-		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory);
+		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory, true);
 		final Map<String, Domain> domains = mrcmFactory.getDomains();
 		Assert.notEmpty(domains, "No MRCM Domains Found");
 		domains.values().forEach(domain -> Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null."));
@@ -884,7 +884,7 @@ public class ValidationService {
 		}
 
 		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
-			releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory);
+			releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory, true);
 			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
 			return writeToIndex(conceptMap, releaseStore, loadingProfile);
 		}
