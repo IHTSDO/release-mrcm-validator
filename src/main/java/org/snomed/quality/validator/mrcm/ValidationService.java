@@ -856,7 +856,7 @@ public class ValidationService {
 				// Build a composite identifier for this 'relationship' (which is actually a fragment of an axiom expression) because it doesn't have its own component identifier.
 				String compositeIdentifier = axiomId + "/Group_" + group + "/Type_" + typeId + "/Destination_" + destinationId;
 				newRelationshipState(compositeIdentifier, effectiveTime, "1", moduleId, namedConcept.toString(), destinationId, String.valueOf(group), typeId, ConceptConstants.STATED_RELATIONSHIP,  "900000000000451002");
-				logger.info("Add axiom relationship {}", compositeIdentifier);
+				logger.debug("Add axiom relationship {}", compositeIdentifier);
 				
 				this.addStatedConceptAttribute(namedConcept.toString(), typeId, destinationId);
 				if(ConceptConstants.isA.equals(typeId)) {
