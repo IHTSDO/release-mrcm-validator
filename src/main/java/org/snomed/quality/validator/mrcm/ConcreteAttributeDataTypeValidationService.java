@@ -21,10 +21,12 @@ public class ConcreteAttributeDataTypeValidationService {
 
 	public void validate(File file, ValidationRun run) throws ReleaseImportException {
 		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
-				LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
-						.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
-				: LoadingProfile.light.withFullRelationshipObjects().withFullConcreteRelationshipObjects()
-				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+				LoadingProfile.light
+						.withStatedRelationships()
+						.withStatedAttributeMapOnConcept()
+						.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET)
+						.withoutInferredAttributeMapOnConcept()
+				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
 		Map<String, Attribute> attributeRangeMap = new HashMap<>();
 		Map<String, Type> concreteAttributeDataTypeMap = new HashMap<>();

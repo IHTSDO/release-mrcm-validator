@@ -1,84 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>org.snomed.quality</groupId>
-    <artifactId>mrcm-validator</artifactId>
-    <version>1.8.2-SNAPSHOT</version>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.snomed.quality</groupId>
+	<artifactId>mrcm-validator</artifactId>
+	<version>1.8.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
-    <properties>
-        <java.version>1.8</java.version>
-        <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.target>${java.version}</maven.compiler.target>
-    </properties>
-    <dependencies>
-        <dependency>
-            <groupId>org.ihtsdo.otf</groupId>
-            <artifactId>snomed-query-service</artifactId>
-            <version>2.0.2-SNAPSHOT</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.mangofactory</groupId>
-                    <artifactId>swagger-springmvc</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.snomed.otf</groupId>
-            <artifactId>snomed-boot</artifactId>
-            <version>3.1.0</version>
-           <exclusions>
-              <exclusion>
-                 <!-- Guava is a dependency of snomed-owl-toolkit via the owlapi-api -->
-                 <groupId>com.google.collections</groupId>
-                 <artifactId>google-collections</artifactId>
-              </exclusion>
-           </exclusions>
-        </dependency>
-       <dependency>
-          <groupId>org.snomed.otf</groupId>
-          <artifactId>snomed-owl-toolkit</artifactId>
-          <version>3.0.0</version>
-       </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
-        </dependency>
-        <dependency>
-        	<groupId>junit</groupId>
-        	<artifactId>junit</artifactId>
-        	<version>4.13.1</version>
-        	<scope>test</scope>
-        </dependency>
-    </dependencies>
-    <repositories>
-    <repository>
-        <id>ihtsdo-releases</id>
-        <releases><enabled>true</enabled></releases>
-        <snapshots><enabled>false</enabled></snapshots>
-        <url>https://nexus3.ihtsdotools.org/repository/maven-releases/</url>
-    </repository>
-    <repository>
-        <id>ihtsdo-snapshots</id>
-        <releases><enabled>false</enabled></releases>
-        <snapshots><enabled>true</enabled></snapshots>
-        <url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
-    </repository>
-    </repositories>
-    <distributionManagement>
-        <repository>
-            <id>ihtsdo-public-nexus-releases</id>
-            <name>IHTSDO Public Nexus Releases</name>
-            <url>https://nexus3.ihtsdotools.org/repository/maven-releases/</url>
-        </repository>
-        <snapshotRepository>
-            <id>ihtsdo-public-nexus-snapshots</id>
-            <name>IHTSDO Public Nexus Snapshots</name>
-            <url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
-    <build>
-    	<plugins>
+	<properties>
+		<java.version>1.8</java.version>
+		<maven.compiler.source>${java.version}</maven.compiler.source>
+		<maven.compiler.target>${java.version}</maven.compiler.target>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.ihtsdo.otf</groupId>
+			<artifactId>snomed-query-service</artifactId>
+			<version>2.0.3-SNAPSHOT</version>
+			<exclusions>
+				<exclusion>
+					<groupId>com.mangofactory</groupId>
+					<artifactId>swagger-springmvc</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.snomed.otf</groupId>
+			<artifactId>snomed-owl-toolkit</artifactId>
+			<version>3.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>3.12.0</version>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.13.1</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+	<repositories>
+		<repository>
+			<id>ihtsdo-releases</id>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<url>https://nexus3.ihtsdotools.org/repository/maven-releases/</url>
+		</repository>
+		<repository>
+			<id>ihtsdo-snapshots</id>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+			<url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
+		</repository>
+	</repositories>
+	<distributionManagement>
+		<repository>
+			<id>ihtsdo-public-nexus-releases</id>
+			<name>IHTSDO Public Nexus Releases</name>
+			<url>https://nexus3.ihtsdotools.org/repository/maven-releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>ihtsdo-public-nexus-snapshots</id>
+			<name>IHTSDO Public Nexus Snapshots</name>
+			<url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
+	<build>
+		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
@@ -103,6 +100,6 @@
 					</execution>
 				</executions>
 			</plugin>
-    	</plugins>
-    </build>
+		</plugins>
+	</build>
 </project>

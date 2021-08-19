@@ -11,8 +11,9 @@ import org.ihtsdo.otf.snomedboot.domain.Description;
 import org.ihtsdo.otf.snomedboot.factory.FactoryUtils;
 import org.ihtsdo.otf.snomedboot.factory.ImpotentComponentFactory;
 import org.ihtsdo.otf.snomedboot.factory.LoadingProfile;
-import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentFactoryImpl;
+import org.ihtsdo.otf.snomedboot.factory.implementation.HighLevelComponentFactoryAdapterImpl;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStore;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStoreComponentFactoryImpl;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ConceptImpl;
 import org.ihtsdo.otf.snomedboot.factory.implementation.standard.DescriptionImpl;
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
@@ -52,7 +53,6 @@ public class ValidationService {
 
 	private static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
-			.withFullRefsetMemberObjects()
 			.withJustRefsets();
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
@@ -113,14 +113,15 @@ public class ValidationService {
 
 	protected SnomedQueryService getSnomedQueryService(File releaseDirectory, ContentType contentType, OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory) throws ReleaseImportException, IOException {
 		LoadingProfile profile = contentType == ContentType.STATED ?
-				LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
-				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
-				: LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects()
-				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+				LoadingProfile.light
+						.withStatedRelationships()
+						.withStatedAttributeMapOnConcept()
+						.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET)
+						.withoutInferredAttributeMapOnConcept()
+				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
 		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionAndDescriptionFactory);
-		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
-		return queryService;
+		return new SnomedQueryService(releaseStore);
 	}
 
 	private void executeConcreteDataTypeValidation(File releaseDirectory, ValidationRun run, SnomedQueryService queryService, Set<String> modules) throws ReleaseImportException, ServiceException {
@@ -799,7 +800,7 @@ public class ValidationService {
 		}
 	}
 
-	protected static class OWLExpressionAndDescriptionFactory extends ComponentFactoryImpl {
+	protected static class OWLExpressionAndDescriptionFactory extends ComponentStoreComponentFactoryImpl {
 
 		private static final String OWL_AXIOM_REFSET = "733073007";
 		private final AxiomRelationshipConversionService axiomConverter;
@@ -895,7 +896,8 @@ public class ValidationService {
 		}
 
 		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
-			releaseImporter.loadSnapshotReleaseFiles(releaseDirectory.getPath(), loadingProfile, componentFactory, true);
+			releaseImporter.loadEffectiveSnapshotReleaseFiles(Collections.singleton(releaseDirectory.getPath()), loadingProfile,
+					new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), true);
 			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
 			return writeToIndex(conceptMap, releaseStore, loadingProfile);
 		}
