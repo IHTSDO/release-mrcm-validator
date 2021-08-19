@@ -53,6 +53,7 @@ public class ValidationService {
 
 	private static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
+			.withIncludedReferenceSetFilenamePattern(".*MRCM.*")
 			.withJustRefsets();
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
