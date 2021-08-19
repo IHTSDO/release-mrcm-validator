@@ -2,7 +2,6 @@ package org.snomed.quality.validator.mrcm;
 
 import com.google.common.base.Strings;
 import it.unimi.dsi.fastutil.longs.Long2ObjectArrayMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import org.apache.commons.lang3.StringUtils;
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.snomedboot.ReleaseImporter;
@@ -65,7 +64,7 @@ public class ValidationService {
 		run.setMRCMDomains(domains);
 		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
 		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
-		run.setInUseConceptIds(mrcmFactory.getInUseConceptIds());
+		run.setConceptsUsedInMRCMTemplates(mrcmFactory.getInUseConceptIds());
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
@@ -77,17 +76,11 @@ public class ValidationService {
 	}
 
 	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
-		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
-				LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
-				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
-				: LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects()
-				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+		OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory = new OWLExpressionAndDescriptionFactory(new ComponentStore(), run.getUngroupedAttributes(),
+				run.getConceptsUsedInMRCMTemplates());
+		SnomedQueryService queryService = getSnomedQueryService(releaseDirectory, run.getContentType(), owlExpressionAndDescriptionFactory);
 
-		OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory = new OWLExpressionAndDescriptionFactory(new ComponentStore(), run.getUngroupedAttributes(), run.getInUseConceptIds());
-		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionAndDescriptionFactory);
-		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
-
-		final Long2ObjectMap<List<DescriptionImpl>> descriptions = owlExpressionAndDescriptionFactory.getDescriptions();
+		final Map<Long, List<DescriptionImpl>> descriptions = owlExpressionAndDescriptionFactory.getDescriptions();
 		LOGGER.info("Total in-use concepts in attribute range {}", descriptions.keySet().size());
 
 		//checking data is loaded properly
@@ -116,6 +109,18 @@ public class ValidationService {
 					break;
 			}
 		}
+	}
+
+	protected SnomedQueryService getSnomedQueryService(File releaseDirectory, ContentType contentType, OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory) throws ReleaseImportException, IOException {
+		LoadingProfile profile = contentType == ContentType.STATED ?
+				LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects().withStatedRelationships()
+				.withStatedAttributeMapOnConcept().withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withoutInferredAttributeMapOnConcept()
+				: LoadingProfile.light.withFullDescriptionObjects().withFullRelationshipObjects().withFullConcreteRelationshipObjects()
+				.withFullRefsetMemberObjects().withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
+
+		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionAndDescriptionFactory);
+		SnomedQueryService queryService = new SnomedQueryService(releaseStore);
+		return queryService;
 	}
 
 	private void executeConcreteDataTypeValidation(File releaseDirectory, ValidationRun run, SnomedQueryService queryService, Set<String> modules) throws ReleaseImportException, ServiceException {
@@ -269,7 +274,9 @@ public class ValidationService {
 		}
 		return new Assertion(attribute, validationType, msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
 	}
-	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Long2ObjectMap<List<DescriptionImpl>> descriptions, List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
+	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Map<Long, List<DescriptionImpl>> descriptions,
+			List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
+
 		Set<String> validationCompleted = new HashSet<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
 			runAttributeRangeValidation(run, queryService, descriptions, domain, precoordinatedTypes, validationCompleted, modules);
@@ -426,7 +433,9 @@ public class ValidationService {
 		return false;
 	}
 
-	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Long2ObjectMap<List<DescriptionImpl>> descriptions, Domain domain, List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
+	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Map<Long, List<DescriptionImpl>> descriptions, Domain domain,
+			List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
+
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
 				LOGGER.error("No range constraint found with attribute id {} for domain {}.", attribute.getAttributeId(), domain.getDomainId());
@@ -438,7 +447,7 @@ public class ValidationService {
 				String rangeConstraint = attributeRange.getRangeConstraint();
 				String rangeKey = attributeId + "_" + rangeConstraint+ "_" + attributeRange.getContentTypeId();
 				if (validationProcessed.contains(rangeKey)) {
-					LOGGER.info("Attribute range is done already:" + attributeRange);
+					LOGGER.info("Attribute range is done already:{}", attributeRange);
 					continue;
 				}
 				validationProcessed.add(rangeKey);
@@ -474,7 +483,9 @@ public class ValidationService {
 		}
 	}
 
-	private void validateConceptsInRange(ValidationRun run, Long2ObjectMap<List<DescriptionImpl>> descriptions, SnomedQueryService queryService, Attribute attribute, String column, String range) throws ServiceException {
+	private void validateConceptsInRange(ValidationRun run, Map<Long, List<DescriptionImpl>> descriptions, SnomedQueryService queryService, Attribute attribute,
+			String column, String range) throws ServiceException {
+
 		List<ConceptImpl> concepts = getConceptsFromRange(range);
 		Set<ConceptImpl> notFoundConcepts = new HashSet<>();
 		List<ConceptImpl> inactiveConcepts = new ArrayList<>();
@@ -788,20 +799,20 @@ public class ValidationService {
 		}
 	}
 
-	private class OWLExpressionAndDescriptionFactory extends ComponentFactoryImpl {
+	protected static class OWLExpressionAndDescriptionFactory extends ComponentFactoryImpl {
 
 		private static final String OWL_AXIOM_REFSET = "733073007";
 		private final AxiomRelationshipConversionService axiomConverter;
 		private final Logger logger = LoggerFactory.getLogger(getClass());
 		private final ComponentStore componentStore;
-		private final Set<Long> inUseConceptIds;
-		private Long2ObjectMap<List<DescriptionImpl>> descriptions;
+		private final Set<Long> conceptsUsedInMRCMTemplates;
+		private final Map<Long, List<DescriptionImpl>> descriptions;
 
-		public OWLExpressionAndDescriptionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes, Set<Long> inUseConceptIds) {
+		public OWLExpressionAndDescriptionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes, Set<Long> conceptsUsedInMRCMTemplates) {
 			super(componentStore);
 			this.componentStore = componentStore;
 			this.axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
-			this.inUseConceptIds = inUseConceptIds;
+			this.conceptsUsedInMRCMTemplates = conceptsUsedInMRCMTemplates;
 			this.descriptions = new Long2ObjectArrayMap<>();
 		}
 
@@ -832,7 +843,7 @@ public class ValidationService {
 
 		@Override
 		public void newDescriptionState(String id, String effectiveTime, String active, String moduleId, String conceptId, String languageCode, String typeId, String term, String caseSignificanceId) {
-			if (inUseConceptIds.contains(Long.parseLong(conceptId))) {
+			if (conceptsUsedInMRCMTemplates.contains(Long.parseLong(conceptId))) {
 				DescriptionImpl description = new DescriptionImpl(id, FactoryUtils.parseActive(active), term, conceptId);
 				if (descriptions.containsKey(Long.valueOf(conceptId))) {
 					descriptions.get(Long.valueOf(conceptId)).add(description);
@@ -844,7 +855,7 @@ public class ValidationService {
 			}
 		}
 
-		public Long2ObjectMap<List<DescriptionImpl>> getDescriptions() {
+		public Map<Long, List<DescriptionImpl>> getDescriptions() {
 			return this.descriptions;
 		}
 
@@ -871,9 +882,9 @@ public class ValidationService {
 		}
 	}
 
-	private class MRCMValidatorReleaseImportManager extends ReleaseImportManager {
+	private static class MRCMValidatorReleaseImportManager extends ReleaseImportManager {
 
-		private ReleaseImporter releaseImporter;
+		private final ReleaseImporter releaseImporter;
 
 		public MRCMValidatorReleaseImportManager() {
 			releaseImporter = new ReleaseImporter();

@@ -8,7 +8,10 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.Sets;
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
+import org.ihtsdo.otf.snomedboot.factory.implementation.standard.ComponentStore;
+import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
 import org.junit.Before;
 import org.junit.Test;
@@ -21,14 +24,14 @@ public class ValidationServiceTest {
 
 	private ValidationService validationService;
 	private ValidationRun run;
-	private File releaseTestFile;
+	private File testReleaseFiles;
 
 	@Before
 	public void setUp() throws ReleaseImportException {
 		validationService = new ValidationService();
 		run = new ValidationRun(null, ContentType.INFERRED, false);
-		releaseTestFile = Paths.get("src/test/resources/rf2TestFiles").toFile();
-		validationService.loadMRCM(releaseTestFile, run);
+		testReleaseFiles = Paths.get("src/test/resources/rf2TestFiles").toFile();
+		validationService.loadMRCM(testReleaseFiles, run);
 	}
 
 	@Test
@@ -57,11 +60,7 @@ public class ValidationServiceTest {
 
 	@Test
 	public void testValidationForAll() throws Exception {
-		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
-		validationService.validateRelease(releaseTestFile, run);
-		assertEquals(271, run.getCompletedAssertions().size());
-		assertEquals(0, run.getSkippedAssertions().size());
-		final List<String> failedMessages = Arrays.asList(
+		final List<String> expectedFailedMessages = Arrays.asList(
 				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute cardinality [0..1]",
 				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain << 91723000 |Anatomical structure (body structure)|",
 				"The attribute value of 3311481003 must conform to the MRCM concrete attribute data type",
@@ -75,17 +74,29 @@ public class ValidationServiceTest {
 				"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
 				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|",
-				"The terms which are using in range constraint for attribute range id 7d23e837-4e2b-45cd-b5c8-8ea9b51daae0 were invalid terms",
+				"The terms which are using in range constraint for attribute range id 7d23e837-4e2b-45cd-b5c8-8ea9b51daae0 are invalid",
 				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid",
-				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid",
-				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid"
+				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid",
+				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid"
 				);
-		assertEquals(failedMessages.size(), run.getFailedAssertions().size());
-		Set<Assertion> test = run.getFailedAssertions();
-		List<String> failedAssertions = run.getFailedAssertions().stream().map(assertion -> assertion.getAssertionText()).collect(Collectors.toList());
-		Collections.sort(failedAssertions);
-//		failedAssertions.stream().forEach(System.out::println);
-		failedMessages.stream().map(assertionText -> failedMessages.contains(assertionText)).forEach(org.junit.Assert::assertTrue);
+		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
+
+		validationService.validateRelease(testReleaseFiles, run);
+
+		assertEquals(271, run.getCompletedAssertions().size());
+		assertEquals(0, run.getSkippedAssertions().size());
+		assertEquals(expectedFailedMessages.size(), run.getFailedAssertions().size());
+
+		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().collect(Collectors.toList());
+		assertEquals(expectedFailedMessages.toString(), actualFailedMessages.toString());
+	}
+
+	@Test
+	public void testLoading() throws ReleaseImportException, IOException, ServiceException {
+		final SnomedQueryService queryService = validationService.getSnomedQueryService(testReleaseFiles, ContentType.INFERRED, new ValidationService.OWLExpressionAndDescriptionFactory(new ComponentStore(),
+				Collections.emptySet(), Collections.emptySet()));
+
+		assertEquals(Sets.newHashSet(404684003L, 39302008L), new HashSet<>(queryService.eclQueryReturnConceptIdentifiers("> 29857009", 0, 100).getConceptIds()));
 	}
 
 	@Test
@@ -124,14 +135,14 @@ public class ValidationServiceTest {
 		domainMap.put(domainToValidate.getDomainId(), domainToValidate);
 		run.setMRCMDomains(domainMap);
 		run.setValidationTypes(types);
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 	}
 
 	@Test
 	public void testAttributeDomainValidation() throws Exception {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_DOMAIN));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(104, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		assertEquals(1, run.getFailedAssertions().size());
@@ -150,7 +161,7 @@ public class ValidationServiceTest {
 	public void testAttributeRangeValidation() throws Exception {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_RANGE));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(92, run.getCompletedAssertions().size());
 		//skipped assertions
 		assertEquals(0, run.getSkippedAssertions().size());
@@ -177,14 +188,14 @@ public class ValidationServiceTest {
 	public void testAxiomValidation() throws ServiceException, ReleaseImportException, IOException {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 	}
 
 	@Test
 	public void testAttributeCardinality() throws Exception {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_CARDINALITY));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(2, run.getCompletedAssertions().size());
 		assertEquals(1, run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
@@ -200,12 +211,12 @@ public class ValidationServiceTest {
 	@Test
 	public void testReportWithSkippedAssertions() throws Exception {
 		run = new ValidationRun(null, ContentType.INFERRED, true);
-		validationService.loadMRCM(releaseTestFile, run);
+		validationService.loadMRCM(testReleaseFiles, run);
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertTrue(run.reportSkippedAssertions());
 		assertEquals(37, run.getSkippedAssertions().size());
 	}
@@ -214,7 +225,7 @@ public class ValidationServiceTest {
 	public void testAttributeGroupCardinality() throws Exception {
 		Assert.notNull(run.getMRCMDomains(), "Domain should not be null");
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(67, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		assertEquals(2, run.getFailedAssertions().size());
@@ -243,7 +254,7 @@ public class ValidationServiceTest {
 				.forEach(attribute -> domainsToValidate.put(domain.getDomainId(), domain)));
 		run.setMRCMDomains(domainsToValidate);
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_DOMAIN));
-		validationService.validateRelease(releaseTestFile, run);
+		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(1, run.getAssertionsWithWarning().size());
 		String failureMsg = "The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain " +
 				"<< ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|";

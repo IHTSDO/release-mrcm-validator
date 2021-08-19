@@ -16,7 +16,7 @@ public final class ValidationRun {
 	private final String releaseDate;
 	private final ContentType contentType;
 	private Set<Long> ungroupedAttributes;
-	private Set<Long> inUseConceptIds;
+	private Set<Long> conceptsUsedInMRCMTemplates;
 	private final boolean reportSkippedAssertions;
 
 	public ValidationRun(final String releaseDate, final ContentType contentType, final boolean reportSkippedAssertions) {
@@ -95,12 +95,12 @@ public final class ValidationRun {
 		return ungroupedAttributes;
 	}
 
-	public final Set<Long> getInUseConceptIds() {
-		return inUseConceptIds;
+	public final Set<Long> getConceptsUsedInMRCMTemplates() {
+		return conceptsUsedInMRCMTemplates;
 	}
 
-	public final void setInUseConceptIds(Set<Long> inUseConceptIds) {
-		this.inUseConceptIds = inUseConceptIds;
+	public final void setConceptsUsedInMRCMTemplates(Set<Long> conceptsUsedInMRCMTemplates) {
+		this.conceptsUsedInMRCMTemplates = conceptsUsedInMRCMTemplates;
 	}
 
 	public final boolean reportSkippedAssertions() {
