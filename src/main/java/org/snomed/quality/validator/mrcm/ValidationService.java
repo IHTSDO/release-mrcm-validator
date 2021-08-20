@@ -59,7 +59,7 @@ public class ValidationService {
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
-		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory, true);
+		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
 		setMRCM(run, mrcmFactory);
 	}
 
@@ -925,7 +925,7 @@ public class ValidationService {
 		private ReleaseStore loadReleaseFiledToStore(Set<String> extractedRF2FilesDirectories, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory, boolean fullSnapshotRelease) throws ReleaseImportException, IOException {
 			if (fullSnapshotRelease) {
 				releaseImporter.loadSnapshotReleaseFiles(extractedRF2FilesDirectories.iterator().next(), loadingProfile,
-						new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), true);
+						new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), false);
 			} else {
 				boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
 				if (loadDelta) {

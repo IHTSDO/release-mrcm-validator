@@ -38,7 +38,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		DataTypeValidationComponentFactory componentFactory = new DataTypeValidationComponentFactory(concreteAttributeDataTypeMap, conversionService);
 
 		if (run.isFullSnapshotRelease()) {
-			releaseImporter.loadSnapshotReleaseFiles(extractedRF2FilesDirectories.iterator().next(), profile,componentFactory, true);
+			releaseImporter.loadSnapshotReleaseFiles(extractedRF2FilesDirectories.iterator().next(), profile,componentFactory, false);
 		} else {
 			boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
 			if (loadDelta) {
