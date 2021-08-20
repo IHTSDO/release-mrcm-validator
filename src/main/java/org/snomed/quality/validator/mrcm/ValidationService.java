@@ -34,6 +34,7 @@ import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Attribute.Type;
 import org.snomed.quality.validator.mrcm.model.Domain;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,27 +60,42 @@ public class ValidationService {
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
 		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory, true);
-		final Map<String, Domain> domains = mrcmFactory.getDomains();
-		Assert.notEmpty(domains, "No MRCM Domains Found");
-		domains.values().forEach(domain -> Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null."));
-		run.setMRCMDomains(domains);
-		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
-		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
-		run.setConceptsUsedInMRCMTemplates(mrcmFactory.getInUseConceptIds());
+		setMRCM(run, mrcmFactory);
+	}
+
+	public final void loadMRCM(final Set<String> extractedRF2FilesDirectories, final ValidationRun run) throws ReleaseImportException {
+		if (run.isFullSnapshotRelease()) {
+			loadMRCM(new File(extractedRF2FilesDirectories.iterator().next()), run);
+			return;
+		}
+
+		final MRCMFactory mrcmFactory = new MRCMFactory();
+		boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
+		if (loadDelta) {
+			new ReleaseImporter().loadEffectiveSnapshotAndDeltaReleaseFiles(extractedRF2FilesDirectories, MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
+		} else {
+			new ReleaseImporter().loadEffectiveSnapshotReleaseFiles(extractedRF2FilesDirectories, MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
+		}
+		setMRCM(run, mrcmFactory);
+	}
+
+	public void validateRelease(Set<String> extractedRF2FilesDirectories, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
+		executeValidation(extractedRF2FilesDirectories, run);
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
-		executeValidation(releaseDirectory, run, modules);
+		run.setModuleIds(modules);
+		executeValidation(Collections.singleton(releaseDirectory.getPath()), run);
 	}
 
 	public void validateRelease(File releaseDirectory, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
-		validateRelease(releaseDirectory, run, Collections.emptySet());
+		executeValidation(Collections.singleton(releaseDirectory.getPath()), run);
 	}
 
-	private void executeValidation(File releaseDirectory, ValidationRun run, Set<String> modules) throws ReleaseImportException, IOException, ServiceException {
+	private void executeValidation(Set<String> extractedRF2FilesDirectories, ValidationRun run) throws ReleaseImportException, IOException, ServiceException {
 		OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory = new OWLExpressionAndDescriptionFactory(new ComponentStore(), run.getUngroupedAttributes(),
 				run.getConceptsUsedInMRCMTemplates());
-		SnomedQueryService queryService = getSnomedQueryService(releaseDirectory, run.getContentType(), owlExpressionAndDescriptionFactory);
+		SnomedQueryService queryService = getSnomedQueryService(extractedRF2FilesDirectories, run.getContentType(), owlExpressionAndDescriptionFactory, run.isFullSnapshotRelease());
 
 		final Map<Long, List<DescriptionImpl>> descriptions = owlExpressionAndDescriptionFactory.getDescriptions();
 		LOGGER.info("Total in-use concepts in attribute range {}", descriptions.keySet().size());
@@ -91,19 +107,19 @@ public class ValidationService {
 		for (ValidationType type : run.getValidationTypes()) {
 			switch (type) {
 				case ATTRIBUTE_DOMAIN :
-					executeAttributeDomainValidation(run, queryService, preCoordinatedTypes, modules);
+					executeAttributeDomainValidation(run, queryService, preCoordinatedTypes);
 					break;
 				case ATTRIBUTE_RANGE :
-					executeAttributeRangeValidation(run, queryService, descriptions, preCoordinatedTypes, modules);
+					executeAttributeRangeValidation(run, queryService, descriptions, preCoordinatedTypes);
 					break;
 				case ATTRIBUTE_CARDINALITY :
-					executeAttributeCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
+					executeAttributeCardinalityValidation(run, queryService, preCoordinatedTypes);
 					break;
 				case ATTRIBUTE_IN_GROUP_CARDINALITY:
-					executeAttributeGroupCardinalityValidation(run, queryService, preCoordinatedTypes, modules);
+					executeAttributeGroupCardinalityValidation(run, queryService, preCoordinatedTypes);
 					break;
 				case CONCRETE_ATTRIBUTE_DATA_TYPE :
-					executeConcreteDataTypeValidation(releaseDirectory, run, queryService, modules);
+					executeConcreteDataTypeValidation(extractedRF2FilesDirectories, run, queryService);
 					break;
 				default :
 					LOGGER.error("Validation Type: '{}' is not implemented yet!", type);
@@ -112,7 +128,7 @@ public class ValidationService {
 		}
 	}
 
-	protected SnomedQueryService getSnomedQueryService(File releaseDirectory, ContentType contentType, OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory) throws ReleaseImportException, IOException {
+	protected SnomedQueryService getSnomedQueryService(Set<String> extractedRF2FilesDirectories, ContentType contentType, OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory, boolean fullSnapshotRelease) throws ReleaseImportException, IOException {
 		LoadingProfile profile = contentType == ContentType.STATED ?
 				LoadingProfile.light
 						.withStatedRelationships()
@@ -121,19 +137,29 @@ public class ValidationService {
 						.withoutInferredAttributeMapOnConcept()
 				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET);
 
-		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(releaseDirectory, profile, owlExpressionAndDescriptionFactory);
+		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(extractedRF2FilesDirectories, profile, owlExpressionAndDescriptionFactory, fullSnapshotRelease);
 		return new SnomedQueryService(releaseStore);
 	}
 
-	private void executeConcreteDataTypeValidation(File releaseDirectory, ValidationRun run, SnomedQueryService queryService, Set<String> modules) throws ReleaseImportException, ServiceException {
+	private void setMRCM(ValidationRun run, MRCMFactory mrcmFactory) {
+		final Map <String, Domain> domains = mrcmFactory.getDomains();
+		Assert.notEmpty(domains, "No MRCM Domains Found");
+		domains.values().forEach(domain -> Assert.notNull(domain.getDomainConstraint(), "Constraint for domain " + domain.getDomainId() + " must not be null."));
+		run.setMRCMDomains(domains);
+		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
+		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
+		run.setConceptsUsedInMRCMTemplates(mrcmFactory.getInUseConceptIds());
+	}
+
+	private void executeConcreteDataTypeValidation(Set<String> extractedRF2FilesDirectories, ValidationRun run, SnomedQueryService queryService) throws ReleaseImportException, ServiceException {
 		// Concrete attribute data type validation
 		ConcreteAttributeDataTypeValidationService dataTypeValidationService = new ConcreteAttributeDataTypeValidationService();
-		dataTypeValidationService.validate(releaseDirectory, run);
+		dataTypeValidationService.validate(extractedRF2FilesDirectories, run);
 		for (Assertion assertion : run.getFailedAssertions()) {
 			List<Long> conceptIds = assertion.getCurrentViolatedConceptIds();
 			for (Long conceptId : conceptIds) {
 				ConceptResult result = queryService.retrieveConcept(String.valueOf(conceptId));
-				if (!modules.isEmpty() && !modules.contains(result.getModuleId())) {
+				if (!CollectionUtils.isEmpty(run.getModuleIds()) && !run.getModuleIds().contains(result.getModuleId())) {
 					continue;
 				}
 				assertion.getCurrentViolatedConcepts().add(result);
@@ -141,12 +167,12 @@ public class ValidationService {
 		}
 	}
 
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
-		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, MANDATORY, modules);
-		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, OPTIONAL, modules);
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List <Long> precoordinatedTypes) throws ServiceException {
+		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, MANDATORY);
+		executeAttributeDomainValidation(run,queryService,precoordinatedTypes, OPTIONAL);
 	}
 
-	private void executeAttributeGroupCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, Set <String> modules) throws ServiceException {
+	private void executeAttributeGroupCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
@@ -169,7 +195,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY, null, modules);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY, null);
 				} else {
 					String skipMsg = "ValidationType:" + ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY.getName() + " Skipped reason: ";
 					if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeInGroupCardinality())) {
@@ -185,7 +211,7 @@ public class ValidationService {
 	}
 
 	private void processValidationResults(ValidationRun run, SnomedQueryService queryService, Attribute attribute,
-										  List <Long> invalidIds, ValidationType type, String domainConstraint, Set <String> modules) throws ServiceException {
+										  List <Long> invalidIds, ValidationType type, String domainConstraint) throws ServiceException {
 		String msg = "";
 		List <ConceptResult> newInvalidConcepts = new ArrayList<>();
 		if (run.getReleaseDate() != null) {
@@ -193,7 +219,7 @@ public class ValidationService {
 			List<ConceptResult> currentRelease = new ArrayList<>();
 			for (Long conceptId : invalidIds) {
 				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
-				if (!modules.isEmpty() && !modules.contains(result.getModuleId())) {
+				if (!CollectionUtils.isEmpty(run.getModuleIds()) && !run.getModuleIds().contains(result.getModuleId())) {
 					continue;
 				}
 				newInvalidConcepts.add(result);
@@ -217,7 +243,7 @@ public class ValidationService {
 			}
 			for (Long conceptId : invalidIds) {
 				ConceptResult result = queryService.retrieveConcept(conceptId.toString());
-				if (!modules.isEmpty() &&  !modules.contains(result.getModuleId())) {
+				if (!CollectionUtils.isEmpty(run.getModuleIds()) &&  !run.getModuleIds().contains(result.getModuleId())) {
 					continue;
 				}
 				newInvalidConcepts.add(result);
@@ -227,7 +253,7 @@ public class ValidationService {
 		}
 	}
 
-	private void executeAttributeCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
+	private void executeAttributeCardinalityValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
 				if (!precoordinatedTypes.contains(Long.parseLong(attribute.getContentTypeId()))) {
@@ -253,7 +279,7 @@ public class ValidationService {
 						invalidIds = conceptIdsWithoutCardinality;
 						invalidIds.removeAll(conceptIdsWithCardinality);
 					}
-					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY, null, modules);
+					processValidationResults(run, queryService, attribute, invalidIds, ValidationType.ATTRIBUTE_CARDINALITY, null);
 				} 
 			}
 		}
@@ -277,11 +303,11 @@ public class ValidationService {
 		return new Assertion(attribute, validationType, msg, failureType, currentInvalidConcepts, previousInvalidConcepts, domainConstraint);
 	}
 	private void executeAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Map<Long, List<DescriptionImpl>> descriptions,
-			List<Long> precoordinatedTypes, Set<String> modules) throws ServiceException {
+			List<Long> precoordinatedTypes) throws ServiceException {
 
 		Set<String> validationCompleted = new HashSet<>();
 		for (Domain domain : run.getMRCMDomains().values()) {
-			runAttributeRangeValidation(run, queryService, descriptions, domain, precoordinatedTypes, validationCompleted, modules);
+			runAttributeRangeValidation(run, queryService, descriptions, domain, precoordinatedTypes, validationCompleted);
 		}
 	}
 
@@ -300,10 +326,10 @@ public class ValidationService {
 	 * @throws ServiceException *
 	 * 
 	*/
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh, Set<String> modules) throws ServiceException {
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrength) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, List<Attribute>> attributesById = new HashMap<>();
-		filterAttributeDomainByStrength(run, queryService, precoordinatedTypes, ruleStrengh, attributeDomainMap, attributesById);
+		filterAttributeDomainByStrength(run, queryService, precoordinatedTypes, ruleStrength, attributeDomainMap, attributesById);
 		
 		for (String attributeId : attributeDomainMap.keySet()) {
 			List<Domain> domains = attributeDomainMap.get(attributeId);
@@ -321,7 +347,7 @@ public class ValidationService {
 			}
 			
 			for (Attribute attribute : attributesById.get(attributeId)) {
-				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString(), modules);
+				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
 			}
 		}
 	}
@@ -436,7 +462,7 @@ public class ValidationService {
 	}
 
 	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Map<Long, List<DescriptionImpl>> descriptions, Domain domain,
-			List<Long> precoordinatedTypes, Set<String> validationProcessed, Set<String> modules) throws ServiceException {
+			List<Long> precoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
 
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
@@ -477,7 +503,7 @@ public class ValidationService {
 					}
 					LOGGER.info("Selecting content out of range for attribute '{}' with out range constraint expression '{}'", attributeId, outOfRangeRule);
 					List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(outOfRangeRule, 0, -1).getConceptIds();
-					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null, modules);
+					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null);
 				} else {
 					run.addSkippedAssertion(constructAssertion(queryService, attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));
 				}
@@ -892,13 +918,24 @@ public class ValidationService {
 			releaseImporter = new ReleaseImporter();
 		}
 
-		public ReleaseStore loadReleaseFilesToMemoryBasedIndex(File releaseDirectory, LoadingProfile loadingProfile, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
-			return loadReleaseFiledToStore(releaseDirectory, loadingProfile, new RamReleaseStore(), componentFactory);
+		public ReleaseStore loadReleaseFilesToMemoryBasedIndex(Set<String> extractedRF2FilesDirectories, LoadingProfile loadingProfile, OWLExpressionAndDescriptionFactory componentFactory, boolean fullSnapshotRelease) throws ReleaseImportException, IOException {
+			return loadReleaseFiledToStore(extractedRF2FilesDirectories, loadingProfile, new RamReleaseStore(), componentFactory, fullSnapshotRelease);
 		}
 
-		private ReleaseStore loadReleaseFiledToStore(File releaseDirectory, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory) throws ReleaseImportException, IOException {
-			releaseImporter.loadEffectiveSnapshotReleaseFiles(Collections.singleton(releaseDirectory.getPath()), loadingProfile,
-					new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), true);
+		private ReleaseStore loadReleaseFiledToStore(Set<String> extractedRF2FilesDirectories, LoadingProfile loadingProfile, ReleaseStore releaseStore, OWLExpressionAndDescriptionFactory componentFactory, boolean fullSnapshotRelease) throws ReleaseImportException, IOException {
+			if (fullSnapshotRelease) {
+				releaseImporter.loadSnapshotReleaseFiles(extractedRF2FilesDirectories.iterator().next(), loadingProfile,
+						new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), true);
+			} else {
+				boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
+				if (loadDelta) {
+					releaseImporter.loadEffectiveSnapshotAndDeltaReleaseFiles(extractedRF2FilesDirectories, loadingProfile,
+							new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), false);
+				} else {
+					releaseImporter.loadEffectiveSnapshotReleaseFiles(extractedRF2FilesDirectories, loadingProfile,
+							new HighLevelComponentFactoryAdapterImpl(loadingProfile, componentFactory, componentFactory), false);
+				}
+			}
 			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
 			return writeToIndex(conceptMap, releaseStore, loadingProfile);
 		}

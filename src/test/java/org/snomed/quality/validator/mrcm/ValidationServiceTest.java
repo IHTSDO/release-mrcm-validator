@@ -30,6 +30,7 @@ public class ValidationServiceTest {
 	public void setUp() throws ReleaseImportException {
 		validationService = new ValidationService();
 		run = new ValidationRun(null, ContentType.INFERRED, false);
+		run.setFullSnapshotRelease(true);
 		testReleaseFiles = Paths.get("src/test/resources/rf2TestFiles").toFile();
 		validationService.loadMRCM(testReleaseFiles, run);
 	}
@@ -93,8 +94,8 @@ public class ValidationServiceTest {
 
 	@Test
 	public void testLoading() throws ReleaseImportException, IOException, ServiceException {
-		final SnomedQueryService queryService = validationService.getSnomedQueryService(testReleaseFiles, ContentType.INFERRED, new ValidationService.OWLExpressionAndDescriptionFactory(new ComponentStore(),
-				Collections.emptySet(), Collections.emptySet()));
+		final SnomedQueryService queryService = validationService.getSnomedQueryService(Collections.singleton(testReleaseFiles.getPath()), ContentType.INFERRED, new ValidationService.OWLExpressionAndDescriptionFactory(new ComponentStore(),
+				Collections.emptySet(), Collections.emptySet()), true);
 
 		assertEquals(Sets.newHashSet(404684003L, 39302008L), new HashSet<>(queryService.eclQueryReturnConceptIdentifiers("> 29857009", 0, 100).getConceptIds()));
 	}

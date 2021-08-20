@@ -14,12 +14,11 @@ import org.snomed.otf.owltoolkit.domain.AxiomRepresentation;
 import org.snomed.otf.owltoolkit.domain.Relationship;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 
-import java.io.File;
 import java.util.*;
 
 public class ConcreteAttributeDataTypeValidationService {
 
-	public void validate(File file, ValidationRun run) throws ReleaseImportException {
+	public void validate(Set<String> extractedRF2FilesDirectories, ValidationRun run) throws ReleaseImportException {
 		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
 				LoadingProfile.light
 						.withStatedRelationships()
@@ -41,7 +40,18 @@ public class ConcreteAttributeDataTypeValidationService {
 		ReleaseImporter releaseImporter = new ReleaseImporter();
 		AxiomRelationshipConversionService conversionService = new AxiomRelationshipConversionService(run.getUngroupedAttributes());
 		DataTypeValidationComponentFactory componentFactory = new DataTypeValidationComponentFactory(concreteAttributeDataTypeMap, conversionService);
-		releaseImporter.loadSnapshotReleaseFiles(file.getAbsolutePath(), profile, componentFactory, true);
+
+		if (run.isFullSnapshotRelease()) {
+			releaseImporter.loadSnapshotReleaseFiles(extractedRF2FilesDirectories.iterator().next(), profile,componentFactory, true);
+		} else {
+			boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
+			if (loadDelta) {
+				releaseImporter.loadEffectiveSnapshotAndDeltaReleaseFiles(extractedRF2FilesDirectories, profile, componentFactory, false);
+			} else {
+				releaseImporter.loadEffectiveSnapshotReleaseFiles(extractedRF2FilesDirectories, profile, componentFactory, false);
+			}
+		}
+
 
 		// Add assertions for all concrete attributes defined in the MRCM
 		attributeRangeMap.values().forEach(attribute -> {

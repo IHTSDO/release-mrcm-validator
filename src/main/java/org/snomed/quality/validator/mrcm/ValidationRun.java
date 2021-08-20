@@ -17,7 +17,9 @@ public final class ValidationRun {
 	private final ContentType contentType;
 	private Set<Long> ungroupedAttributes;
 	private Set<Long> conceptsUsedInMRCMTemplates;
+	private Set<String> moduleIds;
 	private final boolean reportSkippedAssertions;
+	private boolean fullSnapshotRelease;
 
 	public ValidationRun(final String releaseDate, final ContentType contentType, final boolean reportSkippedAssertions) {
 		assertionsCompleted = new ArrayList<>();
@@ -105,6 +107,22 @@ public final class ValidationRun {
 
 	public final boolean reportSkippedAssertions() {
 		return reportSkippedAssertions;
+	}
+
+	public void setFullSnapshotRelease(boolean fullSnapshotRelease) {
+		this.fullSnapshotRelease = fullSnapshotRelease;
+	}
+
+	public boolean isFullSnapshotRelease() {
+		return fullSnapshotRelease;
+	}
+
+	public void setModuleIds(Set<String> moduleIds) {
+		this.moduleIds = moduleIds;
+	}
+
+	public Set<String> getModuleIds() {
+		return moduleIds;
 	}
 
 	@Override
