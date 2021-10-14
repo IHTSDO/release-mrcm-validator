@@ -77,6 +77,8 @@ public final class Constants {
 
 	public static final String RELEASE_DATE_FORMAT = "yyyyMMdd";
 
+	public static final String LATERALITY_ATTRIBUTE = "272741003";
+
 	private Constants() {
 	}
 }

@@ -108,19 +108,24 @@ public class Assertion {
 	}
 	
 	public String getAssertionText() {
-		String assertionText = String.format("The attribute value of %s must conform to the MRCM %s",
+		if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
+				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
+				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType) {
+			return getMessage();
+		}
+		String assertionText = String.format("%s must conform to the MRCM %s",
 				attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
 				validationType.getName().toLowerCase());
+
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeCardinality() + "]";
 		} else if (ValidationType.ATTRIBUTE_IN_GROUP_CARDINALITY == validationType) {
 			assertionText += " [" + attribute.getAttributeInGroupCardinality() + "]";
-		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
-			if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
-				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
-				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType) {
-				assertionText = getMessage();
-			} else {
+		} else if (ValidationType.ATTRIBUTE_RANGE == validationType || ValidationType.CONCRETE_ATTRIBUTE_DATA_TYPE == validationType) {
+			assertionText = String.format("The attribute value of %s must conform to the MRCM %s",
+					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+					validationType.getName().toLowerCase());
+			if (ValidationType.ATTRIBUTE_RANGE == validationType) {
 				assertionText += " " + attribute.getRangeConstraint();
 			}
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
@@ -130,9 +135,7 @@ public class Assertion {
 	}
 
 	public String getDetails() {
-		String detail = String.format("Attribute %s has value which is not conformed to the MRCM %s",
-				attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
-				validationType.getName().toLowerCase());
+		String detail = null;
 		if (ValidationType.ATTRIBUTE_CARDINALITY == validationType) {
 			detail = String.format("The MRCM attribute cardinality is [%s] for %s but found %s",
 					attribute.getAttributeCardinality(),
@@ -144,6 +147,9 @@ public class Assertion {
 					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
 					getFailureCardinalityMessage(attribute.getAttributeInGroupCardinality()));
 		} else if (ValidationType.ATTRIBUTE_RANGE == validationType) {
+			detail = String.format("Attribute %s has value which is not conformed to the MRCM %s",
+					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+					validationType.getName().toLowerCase());
 			if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType) {
 				detail = "The concept is inactive";
 			} else if (ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType) {
@@ -154,6 +160,9 @@ public class Assertion {
 				detail += " " + attribute.getRangeConstraint();
 			}
 		} else if (ValidationType.ATTRIBUTE_DOMAIN == validationType) {
+			detail = String.format(" %s is applied to concepts not conforming to the MRCM %s ",
+					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
+					validationType.getName().toLowerCase());
 			detail +=  domainConstraint != null ? domainConstraint : " ";
 		}
 		return detail;

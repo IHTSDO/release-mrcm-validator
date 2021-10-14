@@ -56,6 +56,7 @@ public class ValidationService {
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
 			.withIncludedReferenceSetFilenamePattern(".*MRCM.*")
 			.withJustRefsets();
+	public static final String MEMBER_OF = "^";
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
@@ -261,7 +262,7 @@ public class ValidationService {
 					run.addSkippedAssertion(constructAssertion(queryService, attribute, ValidationType.ATTRIBUTE_CARDINALITY, CONTENT_TYPE_IS_OUT_OF_SCOPE + attribute.getContentTypeId()));
 					continue;
 				}
-				if ( NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
+				if (NO_CARDINALITY_CONSTRAINT.equals(attribute.getAttributeCardinality())) {
 					run.addSkippedAssertion(constructAssertion(queryService,attribute, ValidationType.ATTRIBUTE_CARDINALITY,
 							"Attribute cardinality constraint is " + attribute.getAttributeCardinality()));
 				} else {
@@ -312,7 +313,7 @@ public class ValidationService {
 	}
 
 	/**
-	 * @param precoordinatedTypes 
+	 * @param preCoordinatedTypes
 	 * VALIDATE: The domain of a given attribute
 	 * RETURNS: Incorrect relationships
 	 *  APPLIES TO: Each attribute <ATTRIBUTE_ID> (which may have one or more domains)
@@ -322,14 +323,14 @@ public class ValidationService {
 	 *  ECL: (*:272741003=*) MINUS (<<91723000 OR <<723264001)
 	 *  ECL: (*:272741003=*) MINUS <<91723000
 	 *  
-	 *  << ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|
+	 *  ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|
 	 * @throws ServiceException *
 	 * 
 	*/
-	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrength) throws ServiceException {
+	private void executeAttributeDomainValidation(ValidationRun run, SnomedQueryService queryService, List<Long> preCoordinatedTypes, String ruleStrength) throws ServiceException {
 		Map<String,List<Domain>> attributeDomainMap = new HashMap<>();
 		Map<String, List<Attribute>> attributesById = new HashMap<>();
-		filterAttributeDomainByStrength(run, queryService, precoordinatedTypes, ruleStrength, attributeDomainMap, attributesById);
+		filterAttributeDomainByStrength(run, queryService, preCoordinatedTypes, ruleStrength, attributeDomainMap, attributesById);
 		
 		for (String attributeId : attributeDomainMap.keySet()) {
 			List<Domain> domains = attributeDomainMap.get(attributeId);
@@ -337,62 +338,51 @@ public class ValidationService {
 				LOGGER.error("Attribute {} has no domain.", attributeId);
 				continue;
 			}
-			boolean nestedQueryFound = containNestedEclQuery(domains);
-			List<Long> violatedConcepts = new ArrayList<>();
-			StringBuilder msgBuilder = new StringBuilder();
-			if (nestedQueryFound) {
-				violatedConcepts = processNestedDomainConstraintQuery(queryService, attributeId, domains, msgBuilder);
+
+			List<Long> violatedConcepts = null;
+			StringBuilder domainConstraintBuilder = new StringBuilder();
+			if (LATERALITY_ATTRIBUTE.equals(attributeId) && hasLateralizableDomain(domains)) {
+				violatedConcepts = processLateralizableDomainConstraintQuery(queryService, attributeId, domains, domainConstraintBuilder);
 			} else {
-				violatedConcepts = processNonNestedDomainConstraintQuery(queryService, attributeId, domains, msgBuilder);
+				violatedConcepts = processNonNestedDomainConstraintQuery(queryService, attributeId, domains, domainConstraintBuilder);
 			}
-			
 			for (Attribute attribute : attributesById.get(attributeId)) {
-				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, msgBuilder.toString());
+				processValidationResults(run, queryService, attribute, violatedConcepts, ValidationType.ATTRIBUTE_DOMAIN, domainConstraintBuilder.toString());
 			}
 		}
 	}
 
-	private List<Long> processNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId, List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
-		 List<Long> violatedConcepts = new ArrayList<>();
+	private boolean hasLateralizableDomain(List<Domain> domains) {
+		return domains.stream().map(Domain::getDomainId).anyMatch(d -> d.equals(LATERALIZABLE_BODY_STRUCTURE_REFSET));
+	}
+	private List<Long> processLateralizableDomainConstraintQuery(SnomedQueryService queryService, String attributeId, List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
+		// This is a workaround for domain constraint ^ 723264001 but 272741003 |Laterality (attribute)| can only be used by a concept
+		// if one of its parents is a member of Lateralizable body structure reference set
+		// It was << ^ 723264001 before 20180731 release and changed to ^ 723264001 however based on above logic
+		// I think the domain constraint should be childOrSelfOf <<! ^ 723264001 but the query service doesn't support childOf or parentOf yet.
+
 		String withAttributeQuery = "*:" + attributeId + "=*";
 		List<Long> conceptsWithAttribute = queryService.eclQueryReturnConceptIdentifiers(withAttributeQuery, 0, -1).getConceptIds();
-		List<Long> result = new ArrayList<>();
+		List<Long> memberOfLateralizbleRefset = new ArrayList<>();
 		for (Domain domain : domains) {
-			msgBuilder.append(domain.getDomainConstraint());
-			List<String> nestedQueries = splitNestedQuery(domain.getDomainConstraint());
-			if (nestedQueries.size() > 2) {
-				String msg = "Found more than two queries nested which is not currently supported yet.";
-				LOGGER.error(msg);
-				continue;
-			}
-			List<Long> domainQueryResult = queryService.eclQueryReturnConceptIdentifiers( nestedQueries.get(0) + "*", 0, -1).getConceptIds();
-			result.addAll(domainQueryResult);
-			if (nestedQueries.size() > 1) {
-				for (Long id : domainQueryResult) {
-					result.addAll(queryService.eclQueryReturnConceptIdentifiers(nestedQueries.get(1) + id, 0, -1).getConceptIds());
-				}
+			if (domain.getDomainId().equals(LATERALIZABLE_BODY_STRUCTURE_REFSET)) {
+				List<Long> result = queryService.eclQueryReturnConceptIdentifiers(domain.getDomainConstraint(), 0, -1).getConceptIds();
+				memberOfLateralizbleRefset.addAll(result);
+				msgBuilder.append(domain.getDomainConstraint());
 			}
 		}
-		for (Long id : conceptsWithAttribute) {
-			if (!result.contains(id)) {
-				violatedConcepts.add(id);
+		List<Long> violatedConcepts = new ArrayList<>();
+		for (Long conceptId : conceptsWithAttribute) {
+			if (memberOfLateralizbleRefset.contains(conceptId)) {
+				continue;
+			}
+			// it should be parentOf but the query service doesn't support childOf or parentOf yet.
+			List<Long> ancestors = queryService.eclQueryReturnConceptIdentifiers(">" + conceptId, 0, -1).getConceptIds();
+			if (ancestors.stream().noneMatch(concept -> memberOfLateralizbleRefset.contains(concept))) {
+				violatedConcepts.add(conceptId);
 			}
 		}
 		return violatedConcepts;
-	}
-
-	private List<String> splitNestedQuery(String nestedDomainQuery) {
-		List<String> splits = new ArrayList<>();
-		if (nestedDomainQuery.startsWith("<<")) {
-			splits.add(nestedDomainQuery.substring(2).trim());
-			splits.add("<<");
-		} else if (nestedDomainQuery.startsWith("^")) {
-			splits.add(nestedDomainQuery.substring(1).trim());
-			splits.add("^");
-		} else {
-			splits.add(nestedDomainQuery);
-		}
-		return splits;
 	}
 
 	private List<Long> processNonNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId,
@@ -414,7 +404,7 @@ public class ValidationService {
 		if (domains.size() > 1) {
 			withAttributeButWrongDomainEcl += ")";
 		}
-		//run ECL query to retrieve failures
+		// run ECL query to retrieve failures
 		LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
 		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
 		return violatedConcepts;
@@ -424,7 +414,7 @@ public class ValidationService {
 			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
-				//There are cases that domain rule is optional e.g 723264001 for Laterality attribute
+				// There are cases that domain rule is optional e.g 723264001 for Laterality attribute
 				if(!ruleStrengh.equals(attribute.getRuleStrengthId())) {
 					continue;
 				}
@@ -451,18 +441,8 @@ public class ValidationService {
 		}
 	}
 
-	private boolean containNestedEclQuery(List<Domain> domains) {
-		//check whether the domain constraint is a nested expression e.g << ^ 723264001
-		for (Domain domain : domains) {
-			if (domain.getDomainConstraint().contains("<<") && domain.getDomainConstraint().contains("^")) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private void runAttributeRangeValidation(ValidationRun run, SnomedQueryService queryService, Map<Long, List<DescriptionImpl>> descriptions, Domain domain,
-			List<Long> precoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
+										 List<Long> preCoordinatedTypes, Set<String> validationProcessed) throws ServiceException {
 
 		for (Attribute attribute : domain.getAttributes()) {
 			if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
@@ -486,7 +466,7 @@ public class ValidationService {
 				validateConceptsInRange(run, descriptions, queryService, attributeRange, "range constraint", attributeRange.getRangeConstraint());
 				validateConceptsInRange(run, descriptions, queryService, attributeRange, "range rule", attributeRange.getRangeRule());
 
-				if (precoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
+				if (preCoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
 					String outOfRangeRule = null;
 					// check concrete attribute range constraint
 					if (isConcreteRangeConstraint(rangeConstraint)) {
@@ -561,7 +541,7 @@ public class ValidationService {
 			List<ConceptResult> currentViolatedConcepts = notFoundConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
-			msg = String.format("The concepts which are using in %s for attribute range id %s do not exist", column, attribute.getUuid().toString());
+			msg = String.format("Concepts used in %s for MRCM attribute range %s do not exist", column, attribute.getUuid().toString());
 			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
 			run.addCompletedAssertion(assertion);
 		}
@@ -569,7 +549,7 @@ public class ValidationService {
 			List<ConceptResult> currentViolatedConcepts = inactiveConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
-			msg = String.format("The concepts which are using in %s for attribute range id %s are inactive", column, attribute.getUuid().toString());
+			msg = String.format("Concepts used in %s for MRCM attribute range %s are inactive", column, attribute.getUuid().toString());
 			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
 			run.addCompletedAssertion(assertion);
 		}
@@ -577,7 +557,7 @@ public class ValidationService {
 			List<ConceptResult> currentViolatedConcepts = invalidTermConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "1", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
-			msg = String.format("The terms which are using in %s for attribute range id %s are invalid", column, attribute.getUuid().toString());
+			msg = String.format("Terms used in the %s for MRCM attribute range %s are invalid", column, attribute.getUuid().toString());
 			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
 			run.addCompletedAssertion(assertion);
 		}
@@ -722,7 +702,7 @@ public class ValidationService {
 							addInUseConceptIds(attributeRange.getRangeConstraint());
 							break;
 						default:
-							LOGGER.error("Invalid refsetId:" + refsetId);
+							LOGGER.error("Invalid refsetId {}", refsetId);
 							break;
 					}
 				}

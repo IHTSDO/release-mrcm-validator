@@ -1,0 +1,2 @@
+id	effectivetime	active	moduleid	refsetid	referencedcomponentid
+9f2b4d3d-eebc-424b-9215-e3655732217d	20170131	1	900000000000207008	723264001	91723000

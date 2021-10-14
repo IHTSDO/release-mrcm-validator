@@ -15,7 +15,6 @@ import java.util.List;
 
 import static org.snomed.quality.validator.mrcm.Constants.*;
 import static org.snomed.quality.validator.mrcm.ContentType.INFERRED;
-import static org.snomed.quality.validator.mrcm.ContentType.STATED;
 
 public class Application {
 

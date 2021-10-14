@@ -62,10 +62,16 @@ public class ValidationServiceTest {
 	@Test
 	public void testValidationForAll() throws Exception {
 		final List<String> expectedFailedMessages = Arrays.asList(
-				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute cardinality [0..1]",
-				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain << 91723000 |Anatomical structure (body structure)|",
+				"272741003 |Laterality (attribute)| must conform to the MRCM attribute cardinality [0..1]",
+				"272741003 |Laterality (attribute)| must conform to the MRCM attribute domain << 91723000 |Anatomical structure (body structure)|",
+				"3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
+				"363698007 |Finding site (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
+				"Terms used in the range constraint for MRCM attribute range 7d23e837-4e2b-45cd-b5c8-8ea9b51daae0 are invalid",
+				"Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid",
+				"Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid",
+				"Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid",
+				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute range << 182353008 |Side (qualifier value)|",
 				"The attribute value of 3311481003 must conform to the MRCM concrete attribute data type",
-				"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
 				"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute range dec(#10..#20)",
 				"The attribute value of 3311482006 |Has integer presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute range int(#30..#40)",
 				"The attribute value of 3311482006 |Has integer presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
@@ -73,12 +79,7 @@ public class ValidationServiceTest {
 				"The attribute value of 3311482007 |Has string presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
-				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute in group cardinality [0..1]",
-				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|",
-				"The terms which are using in range constraint for attribute range id 7d23e837-4e2b-45cd-b5c8-8ea9b51daae0 are invalid",
-				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid",
-				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid",
-				"The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid"
+				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|"
 				);
 		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
 
@@ -86,8 +87,6 @@ public class ValidationServiceTest {
 
 		assertEquals(271, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
-		assertEquals(expectedFailedMessages.size(), run.getFailedAssertions().size());
-
 		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().collect(Collectors.toList());
 		assertEquals(expectedFailedMessages.toString(), actualFailedMessages.toString());
 	}
@@ -148,11 +147,10 @@ public class ValidationServiceTest {
 		assertEquals(0, run.getSkippedAssertions().size());
 		assertEquals(1, run.getFailedAssertions().size());
 		for (Assertion assertion : run.getFailedAssertions()) {
-			System.out.println(assertion);
 			assertEquals("272741003", assertion.getAttribute().getAttributeId());
 			assertEquals("723597001", assertion.getAttribute().getRuleStrengthId());
-			assertEquals(4, assertion.getCurrentViolatedConceptIds().size());
-			List<Long> expected = Arrays.asList(Long.valueOf("159530000"), Long.valueOf("160959002"), Long.valueOf("161054003"), Long.valueOf("102563003"));
+			assertEquals(3, assertion.getCurrentViolatedConceptIds().size());
+			List<Long> expected = Arrays.asList(160959002L, 161054003L, 102563003L);
 			assertEquals(expected.size(), assertion.getCurrentViolatedConceptIds().size());
 			assertTrue(expected.containsAll(assertion.getCurrentViolatedConceptIds()));
 		}
@@ -164,10 +162,10 @@ public class ValidationServiceTest {
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_RANGE));
 		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(92, run.getCompletedAssertions().size());
-		//skipped assertions
+		// skipped assertions
 		assertEquals(0, run.getSkippedAssertions().size());
-		assertEquals(8, run.getFailedAssertions().size());
-		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "3311482006", "3311482007", "363702006");
+		assertEquals(9, run.getFailedAssertions().size());
+		List<String> expectedFailed = Arrays.asList("363698007", "3311482005", "3311482006", "3311482007", "363702006", "272741003");
 		for (Assertion assertion : run.getFailedAssertions()) {
 			assertTrue(expectedFailed.contains(assertion.getAttribute().getAttributeId()));
 			if ("363698007".equals(assertion.getAttribute().getAttributeId())) {
@@ -179,7 +177,7 @@ public class ValidationServiceTest {
 				assertTrue(assertion.getCurrentViolatedConceptIds().contains(375745003L) || assertion.getCurrentViolatedConceptIds().contains(3311482005L));
 
 				if (assertion.getCurrentViolatedConceptIds().contains(3311482005L)) {
-					assertEquals("The terms which are using in range rule for attribute range id e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid", assertion.getMessage());
+					assertEquals("Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb05 are invalid", assertion.getMessage());
 				}
 			}
 		}
@@ -257,14 +255,13 @@ public class ValidationServiceTest {
 		run.setValidationTypes(Collections.singletonList(ValidationType.ATTRIBUTE_DOMAIN));
 		validationService.validateRelease(testReleaseFiles, run);
 		assertEquals(1, run.getAssertionsWithWarning().size());
-		String failureMsg = "The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute domain " +
-				"<< ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|";
+		String failureMsg = "272741003 |Laterality (attribute)| must conform to the MRCM attribute domain ^ 723264001 |Lateralizable body structure reference set (foundation metadata concept)|";
 		run.getAssertionsWithWarning().forEach(assertion -> {
 			assertEquals(failureMsg, assertion.getAssertionText());
 			assertEquals(attributeId, assertion.getAttribute().getAttributeId());
 			assertEquals(FailureType.WARNING, assertion.getFailureType());
-			assertEquals(6, assertion.getCurrentViolatedConceptIds().size());
-			assertTrue(assertion.getCurrentViolatedConceptIds().containsAll(Arrays.asList(159530000L, 91723000L, 102563003L, 160959002L, 161054003L, 113343008L)));
+			assertEquals(3, assertion.getCurrentViolatedConceptIds().size());
+			assertTrue(assertion.getCurrentViolatedConceptIds().containsAll(Arrays.asList(102563003L, 160959002L, 161054003L)));
 		});
 	}
 
@@ -288,8 +285,9 @@ public class ValidationServiceTest {
 		final Set<Assertion> failedAssertions = run.getFailedAssertions();
 		assertEquals(5, failedAssertions.size());
 		failedAssertions.forEach(failed -> {
-			assertTrue(assertionMessages.contains(failed.getAssertionText()));
-			assertTrue(failedAssertionMessages.contains(failed.getMessage()));
+			System.out.println(failed.getAssertionText());
+			assertTrue(failed.getAssertionText(), assertionMessages.contains(failed.getAssertionText()));
+			assertTrue(failed.getMessage(), failedAssertionMessages.contains(failed.getMessage()));
 			assertEquals(FailureType.ERROR, failed.getFailureType());
 			assertTrue(expectedViolatedConceptIds.containsAll(failed.getCurrentViolatedConceptIds()));
 		});
