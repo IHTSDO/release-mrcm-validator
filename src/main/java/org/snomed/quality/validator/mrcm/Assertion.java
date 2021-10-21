@@ -74,6 +74,14 @@ public class Assertion {
 		return currentViolatedConcepts;
 	}
 
+	public void setCurrentViolatedConcepts(List<ConceptResult> currentViolatedConcepts) {
+		this.currentViolatedConcepts = currentViolatedConcepts;
+	}
+
+	public void setCurrentViolatedConceptIds(List<Long> currentViolatedConceptIds) {
+		this.currentViolatedConceptIds = currentViolatedConceptIds;
+	}
+
 	public List<ConceptResult> getPreviousViolatedConcepts() {
 		return previousViolatedConcepts;
 	}
