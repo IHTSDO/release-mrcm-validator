@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.snomed.quality.validator.mrcm.Constants.*;
 import static org.snomed.quality.validator.mrcm.ContentType.INFERRED;
+import static org.snomed.quality.validator.mrcm.ContentType.STATED;
 
 public class Application {
 
@@ -52,12 +53,14 @@ public class Application {
 	}
 
 	private static List<ContentType> getContentTypes(String contentTypeArg) {
-		if (contentTypeArg == null) {
-			return Collections.singletonList(INFERRED);
+		if (contentTypeArg == null || contentTypeArg.isEmpty()) {
+			// default to run both
+			return Arrays.asList(STATED, INFERRED);
 		}
 		List<ContentType> contentTypes = ContentType.getContentTypes(Arrays.asList(contentTypeArg.split(",")));
 		if (contentTypes.isEmpty()) {
-			return Collections.singletonList(INFERRED);
+			// default to run both
+			return Arrays.asList(STATED, INFERRED);
 		}
 		return contentTypes;
 	}
@@ -67,6 +70,7 @@ public class Application {
 		for (final ContentType contentType : contentTypes) {
 			final ValidationService service = new ValidationService();
 			final ValidationRun run = new ValidationRun(releaseDate, contentType, true);
+			run.setFullSnapshotRelease(true);
 			if (releasePackage == null) {
 				// No external package specified, using default soft link release path.
 				releasePackage = "release";
