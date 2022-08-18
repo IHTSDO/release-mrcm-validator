@@ -6,8 +6,8 @@ public enum ValidationType {
 	ATTRIBUTE_RANGE("Attribute range"),
 	ATTRIBUTE_CARDINALITY("Attribute cardinality"),
 	ATTRIBUTE_IN_GROUP_CARDINALITY("Attribute in group cardinality"),
-	CONCRETE_ATTRIBUTE_DATA_TYPE("Concrete attribute data type");
-
+	CONCRETE_ATTRIBUTE_DATA_TYPE("Concrete attribute data type"),
+	LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE("Lateralizable reference set type");
 	private final String name;
 
 	ValidationType(final String name) {

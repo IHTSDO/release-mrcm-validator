@@ -33,6 +33,7 @@ import org.snomed.quality.validator.mrcm.Assertion.FailureType;
 import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Attribute.Type;
 import org.snomed.quality.validator.mrcm.model.Domain;
+import org.snomed.quality.validator.mrcm.model.ReferenceSetMember;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
@@ -52,15 +53,15 @@ public class ValidationService {
 
 	private static final Pattern CONCEPT_TERM_PATTERN = Pattern.compile("\\d+\\s\\|(.*?)\\|");
 
-	private static final LoadingProfile MRCM_REFSET_LOADING_PROFILE = new LoadingProfile()
-			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET)
+	private static final LoadingProfile MRCM_AND_SIMPLE_REFSET_LOADING_PROFILE = new LoadingProfile()
+			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET, LATERALIZABLE_BODY_STRUCTURE_REFSET)
 			.withIncludedReferenceSetFilenamePattern(".*MRCM.*")
+			.withIncludedReferenceSetFilenamePattern(".*_Refset_Simple.*")
 			.withJustRefsets();
-	public static final String MEMBER_OF = "^";
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
-		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
+		new ReleaseImporter().loadSnapshotReleaseFiles(sourceDirectory.getPath(), MRCM_AND_SIMPLE_REFSET_LOADING_PROFILE, mrcmFactory, false);
 		setMRCM(run, mrcmFactory);
 	}
 
@@ -73,9 +74,9 @@ public class ValidationService {
 		final MRCMFactory mrcmFactory = new MRCMFactory();
 		boolean loadDelta = RF2ReleaseFilesUtil.anyDeltaFilesPresent(extractedRF2FilesDirectories);
 		if (loadDelta) {
-			new ReleaseImporter().loadEffectiveSnapshotAndDeltaReleaseFiles(extractedRF2FilesDirectories, MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
+			new ReleaseImporter().loadEffectiveSnapshotAndDeltaReleaseFiles(extractedRF2FilesDirectories, MRCM_AND_SIMPLE_REFSET_LOADING_PROFILE, mrcmFactory, false);
 		} else {
-			new ReleaseImporter().loadEffectiveSnapshotReleaseFiles(extractedRF2FilesDirectories, MRCM_REFSET_LOADING_PROFILE, mrcmFactory, false);
+			new ReleaseImporter().loadEffectiveSnapshotReleaseFiles(extractedRF2FilesDirectories, MRCM_AND_SIMPLE_REFSET_LOADING_PROFILE, mrcmFactory, false);
 		}
 		setMRCM(run, mrcmFactory);
 	}
@@ -122,6 +123,11 @@ public class ValidationService {
 				case CONCRETE_ATTRIBUTE_DATA_TYPE :
 					executeConcreteDataTypeValidation(extractedRF2FilesDirectories, run, queryService);
 					break;
+				case LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE:
+					if (ContentType.INFERRED.equals(run.getContentType())) {
+						executeLateralizableRefsetValidation(run, queryService);
+					}
+					break;
 				default :
 					LOGGER.error("Validation Type: '{}' is not implemented yet!", type);
 					break;
@@ -150,6 +156,13 @@ public class ValidationService {
 		run.setAttributeRangesMap(mrcmFactory.getAttributeRangeMap());
 		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
 		run.setConceptsUsedInMRCMTemplates(mrcmFactory.getInUseConceptIds());
+		run.setLateralizableRefsetMembers(mrcmFactory.getLateralizableRefsets());
+	}
+
+	private void executeLateralizableRefsetValidation(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
+		// Concrete attribute data type validation
+		LateralizableRefsetValidationService lateralizableRefsetValidationService = new LateralizableRefsetValidationService();
+		lateralizableRefsetValidationService.validate(queryService, run);
 	}
 
 	private void executeConcreteDataTypeValidation(Set<String> extractedRF2FilesDirectories, ValidationRun run, SnomedQueryService queryService) throws ReleaseImportException, ServiceException {
@@ -667,7 +680,6 @@ public class ValidationService {
 
 	private class MRCMFactory extends ImpotentComponentFactory {
 
-		private static final int domDomainConstraintIndex = 0;
 		private static final int proximalPrimitiveConstraint = 2;
 		private static final int attDomainIdIndex = 0;
 		private static final int ranRangeConstraintIndex = 0;
@@ -679,6 +691,7 @@ public class ValidationService {
 		private Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
 		private Set<Long> ungroupedAttributes = new HashSet<>();
 		private Set<Long> inUseConceptIds = new HashSet<>();
+		private Set<ReferenceSetMember> lateralizableRefsets = new HashSet<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
@@ -700,6 +713,9 @@ public class ValidationService {
 							Attribute attributeRange =createAttributeRange(id, referencedComponentId, otherValues);
 							addInUseConceptIds(attributeRange.getRangeRule());
 							addInUseConceptIds(attributeRange.getRangeConstraint());
+							break;
+						case LATERALIZABLE_BODY_STRUCTURE_REFSET:
+							lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, true, moduleId, refsetId, referencedComponentId));
 							break;
 						default:
 							LOGGER.error("Invalid refsetId {}", refsetId);
@@ -734,6 +750,10 @@ public class ValidationService {
 
 		public Map<String, Domain> getDomains() {
 			return domains;
+		}
+
+		public Set <ReferenceSetMember> getLateralizableRefsets() {
+			return lateralizableRefsets;
 		}
 
 		private Domain getCreateDomain(String referencedComponentId) {
@@ -809,7 +829,6 @@ public class ValidationService {
 
 	protected static class OWLExpressionAndDescriptionFactory extends ComponentStoreComponentFactoryImpl {
 
-		private static final String OWL_AXIOM_REFSET = "733073007";
 		private final AxiomRelationshipConversionService axiomConverter;
 		private final Logger logger = LoggerFactory.getLogger(getClass());
 		private final ComponentStore componentStore;

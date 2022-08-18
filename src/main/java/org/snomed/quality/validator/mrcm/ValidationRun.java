@@ -2,6 +2,7 @@ package org.snomed.quality.validator.mrcm;
 
 import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.snomed.quality.validator.mrcm.model.Domain;
+import org.snomed.quality.validator.mrcm.model.ReferenceSetMember;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -10,6 +11,7 @@ public final class ValidationRun {
 
 	private List<ValidationType> validationTypes;
 	private Map<String, Domain> mrcmDomains;
+	private Set<ReferenceSetMember> lateralizableRefsetMembers;
 	private Map<String, List<Attribute>> attributeRangesMap;
 	private final List<Assertion> assertionsCompleted;
 	private final List<Assertion> assertionSkipped;
@@ -69,6 +71,10 @@ public final class ValidationRun {
 		return assertionsCompleted.stream().filter(Assertion::reportAsError).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
 
+	public final Set<Assertion> getPassedAssertions() {
+		return assertionsCompleted.stream().filter(Assertion::invalidConceptsNotFound).collect(Collectors.toSet());
+	}
+
 	public final Set<Assertion> getAssertionsWithWarning() {
 		return assertionsCompleted.stream().filter(Assertion::reportAsWarning).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
@@ -123,6 +129,14 @@ public final class ValidationRun {
 
 	public Set<String> getModuleIds() {
 		return moduleIds;
+	}
+
+	public void setLateralizableRefsetMembers(Set<ReferenceSetMember> lateralizableRefsetMembers) {
+		this.lateralizableRefsetMembers = lateralizableRefsetMembers;
+	}
+
+	public Set<ReferenceSetMember> getLateralizableRefsetMembers() {
+		return lateralizableRefsetMembers;
 	}
 
 	@Override

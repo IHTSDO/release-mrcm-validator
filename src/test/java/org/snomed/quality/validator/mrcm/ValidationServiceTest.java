@@ -85,7 +85,7 @@ public class ValidationServiceTest {
 
 		validationService.validateRelease(testReleaseFiles, run);
 
-		assertEquals(271, run.getCompletedAssertions().size());
+		assertEquals(273, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().collect(Collectors.toList());
 		assertEquals(expectedFailedMessages.toString(), actualFailedMessages.toString());

@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.snomed.quality.validator.mrcm.model.Attribute;
+import org.springframework.util.CollectionUtils;
 
 public class Assertion {
 	public static enum FailureType {
@@ -27,6 +28,7 @@ public class Assertion {
 	private Attribute attribute;
 	private List<Long> currentViolatedConceptIds;
 	private List<ConceptResult> currentViolatedConcepts;
+	private List<String> currentViolatedReferenceSetMembers;
 	private List<Long> previousViolatedConceptIds;
 	private List<ConceptResult> previousViolatedConcepts;
 	private final String message;
@@ -34,7 +36,17 @@ public class Assertion {
 	private ValidationSubType validationSubType;
 	private FailureType failureType;
 	private String domainConstraint;
-	
+
+	public Assertion(UUID uuid, ValidationType type, String msg, FailureType failureType) {
+		this.uuid =uuid;
+		this.validationType = type;
+		this.message = msg;
+		this.failureType = failureType;
+		this.currentViolatedConceptIds = new ArrayList<>();
+		this.previousViolatedConceptIds = new ArrayList<>();
+		this.currentViolatedConcepts = new ArrayList<>();
+	}
+
 	public Assertion(Attribute attribute, ValidationType type, String msg, FailureType failureType) {
 		this.uuid = attribute.getUuid();
 		this.attribute = attribute;
@@ -78,6 +90,14 @@ public class Assertion {
 		this.currentViolatedConcepts = currentViolatedConcepts;
 	}
 
+	public List<String> getCurrentViolatedReferenceSetMembers() {
+		return currentViolatedReferenceSetMembers;
+	}
+
+	public void setCurrentViolatedReferenceSetMembers(List<String> currentViolatedReferenceSetMembers) {
+		this.currentViolatedReferenceSetMembers = currentViolatedReferenceSetMembers;
+	}
+
 	public void setCurrentViolatedConceptIds(List<Long> currentViolatedConceptIds) {
 		this.currentViolatedConceptIds = currentViolatedConceptIds;
 	}
@@ -96,7 +116,13 @@ public class Assertion {
 
 	public boolean invalidConceptsFound() {
 		return (currentViolatedConceptIds != null && !currentViolatedConceptIds.isEmpty()) 
-				|| (previousViolatedConceptIds != null && !previousViolatedConceptIds.isEmpty());
+				|| (previousViolatedConceptIds != null && !previousViolatedConceptIds.isEmpty())
+				|| (currentViolatedReferenceSetMembers != null && !currentViolatedReferenceSetMembers.isEmpty());
+	}
+
+	public boolean invalidConceptsNotFound() {
+		return CollectionUtils.isEmpty(currentViolatedConceptIds) && CollectionUtils.isEmpty(previousViolatedConceptIds)
+				&& CollectionUtils.isEmpty(currentViolatedReferenceSetMembers);
 	}
 	
 	public boolean reportAsError() {
@@ -118,7 +144,8 @@ public class Assertion {
 	public String getAssertionText() {
 		if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
 				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
-				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType) {
+				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType
+				|| ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType) {
 			return getMessage();
 		}
 		String assertionText = String.format("%s must conform to the MRCM %s",
@@ -172,6 +199,12 @@ public class Assertion {
 					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
 					validationType.getName().toLowerCase());
 			detail +=  domainConstraint != null ? domainConstraint : " ";
+		} else if (ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType) {
+			if (!this.currentViolatedReferenceSetMembers.isEmpty()) {
+				detail = "Refset member Id= %s should be inactivated/removed from Lateralizable reference set";
+			} else {
+				detail = "Concept Id= %s should be added to Lateralizable reference set";
+			}
 		}
 		return detail;
 	}
