@@ -200,7 +200,7 @@ public class Assertion {
 					validationType.getName().toLowerCase());
 			detail +=  domainConstraint != null ? domainConstraint : " ";
 		} else if (ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType) {
-			if (!this.currentViolatedReferenceSetMembers.isEmpty()) {
+			if (!CollectionUtils.isEmpty(this.currentViolatedReferenceSetMembers)) {
 				detail = "Refset member Id= %s should be inactivated/removed from Lateralizable reference set";
 			} else {
 				detail = "Concept Id= %s should be added to Lateralizable reference set";
