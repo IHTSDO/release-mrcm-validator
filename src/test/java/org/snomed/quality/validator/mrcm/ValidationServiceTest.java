@@ -79,8 +79,7 @@ public class ValidationServiceTest {
 				"The attribute value of 3311482007 |Has string presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311487004 must conform to the MRCM concrete attribute data type",
-				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|",
-				"The refset members need to be inactivated/removed from Lateralizable reference set"
+				"The attribute value of 363698007 |Finding site (attribute)| must conform to the MRCM attribute range << 442083009 |Anatomical or acquired body structure (body structure)|"
 				);
 		Assert.notNull(run.getMRCMDomains(),"MRCM Domains should not be null.");
 

@@ -19,8 +19,8 @@ public class LateralizableRefsetValidationService {
 	public static final String CONCEPTS_NEED_TO_BE_ADDED_TO_LATERALIZABLE_REFSET_TEXT = "The concepts need to be added to Lateralizable reference set";
 
 	public void validate(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
-		Set<Long> conceptsToRemove = getRelevantConceptsToRemove(queryService);
-		Set<Long> conceptsToAdd = getRelevantConceptsToAdd(queryService);
+		Set<Long> conceptsToRemove = getRelevantConceptsToRemove(queryService, run);
+		Set<Long> conceptsToAdd = getRelevantConceptsToAdd(queryService, run);
 
 		Assertion assertionOfMembersToRemove = new Assertion(UUID.fromString(ASSERTION_ID_MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET), ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE, MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET_TEXT, Assertion.FailureType.ERROR);
 		run.addCompletedAssertion(assertionOfMembersToRemove);
@@ -59,7 +59,7 @@ public class LateralizableRefsetValidationService {
 		}
 	}
 
-	private Set<Long> getRelevantConceptsToRemove(SnomedQueryService queryService) throws ServiceException {
+	private Set<Long> getRelevantConceptsToRemove(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
 		// Concepts which have been lateralised
 		String byLaterality = "(^ 723264001 AND << 91723000) : (272741003 = (7771000 OR 24028007 OR 51440002))";
 
@@ -67,24 +67,38 @@ public class LateralizableRefsetValidationService {
 		String byNoPrerequisiteAncestor = "^ 723264001 MINUS (^ 723264001 AND << 423857001)";
 
 		Set<Long> conceptsToRemove = new HashSet<>();
+		Set<Long> result = new HashSet<>();
 		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byLaterality));
 		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byNoPrerequisiteAncestor));
 
-		return conceptsToRemove;
+		for (Long conceptId : conceptsToRemove) {
+			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
+			if (conceptResult.getEffectiveTime().equals(run.getReleaseDate())) {
+				result.add(conceptId);
+			}
+		}
+		return result;
 	}
 
-	private Set<Long> getRelevantConceptsToAdd(SnomedQueryService queryService) throws ServiceException {
+	private Set<Long> getRelevantConceptsToAdd(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
 		// Concepts which have the laterality attribute with an appropriate value
 		String byLaterality = "( (<< 91723000 : 272741003 = 182353008) MINUS ( * : 272741003 = (7771000	 OR 24028007 OR 51440002) ) )  MINUS (^ 723264001)";
 
 		Set<Long> conceptsToAdd = new HashSet<>();
+		Set<Long> result = new HashSet<>();
 		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byLaterality));
 
 		// Concepts which are within a certain hierarchy and have an ancestor within the reference set
 		String byHierarchy = "(( << 91723000 MINUS (* : 272741003 = (7771000 OR 24028007 OR 51440002 )))  AND (<  (^ 723264001)))	MINUS (^ 723264001)";
 		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byHierarchy));
 
-		return conceptsToAdd;
+		for (Long conceptId : conceptsToAdd) {
+			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
+			if (conceptResult.getEffectiveTime().equals(run.getReleaseDate())) {
+				result.add(conceptId);
+			}
+		}
+		return result;
 	}
 
 	private List<Long> getAllConceptsByECL(SnomedQueryService queryService, String ecl) throws ServiceException {
