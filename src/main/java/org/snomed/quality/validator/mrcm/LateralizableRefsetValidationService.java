@@ -71,6 +71,9 @@ public class LateralizableRefsetValidationService {
 		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byLaterality));
 		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byNoPrerequisiteAncestor));
 
+		// Do not remove Concepts if they are also being added
+		getAllConceptsToAdd(queryService, run).forEach(conceptsToRemove::remove);
+
 		for (Long conceptId : conceptsToRemove) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
 			if (conceptResult.getEffectiveTime().equals(run.getReleaseDate())) {
@@ -80,6 +83,7 @@ public class LateralizableRefsetValidationService {
 		return result;
 	}
 
+	// Find Concepts which should be added to reference set. Concepts already in the reference set are excluded.
 	private Set<Long> getRelevantConceptsToAdd(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
 		// Concepts which have the laterality attribute with an appropriate value
 		String byLaterality = "( (<< 91723000 : 272741003 = 182353008) MINUS ( * : 272741003 = (7771000	 OR 24028007 OR 51440002) ) )  MINUS (^ 723264001)";
@@ -98,6 +102,25 @@ public class LateralizableRefsetValidationService {
 				result.add(conceptId);
 			}
 		}
+		return result;
+	}
+
+	// Find Concepts which should be added to reference set. Concepts already in the reference set are included.
+	private Set<Long> getAllConceptsToAdd(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
+		// Concepts which have the laterality attribute and have an appropriate ancestor.
+		String byLateralityAndHierarchy = "( ( ( << 91723000 |Anatomical structure (body structure)| : 272741003 | Laterality (attribute) | = 182353008 |Side (qualifier value)|) MINUS ( * : 272741003 | Laterality (attribute) | = (7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) OR ( ( ( << 91723000 |Anatomical structure (body structure)|) AND ( < (^ 723264001) ) ) MINUS ( * : 272741003 | Laterality (attribute) | = ( 7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) )";
+
+		Set<Long> conceptsToAdd = new HashSet<>();
+		Set<Long> result = new HashSet<>();
+		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byLateralityAndHierarchy));
+
+		for (Long conceptId : conceptsToAdd) {
+			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
+			if (conceptResult.getEffectiveTime().equals(run.getReleaseDate())) {
+				result.add(conceptId);
+			}
+		}
+
 		return result;
 	}
 
