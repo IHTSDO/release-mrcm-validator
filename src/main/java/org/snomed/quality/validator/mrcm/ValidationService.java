@@ -124,7 +124,7 @@ public class ValidationService {
 					executeConcreteDataTypeValidation(extractedRF2FilesDirectories, run, queryService);
 					break;
 				case LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE:
-					if (ContentType.INFERRED.equals(run.getContentType())) {
+					if (ContentType.INFERRED.equals(run.getContentType()) && CollectionUtils.isEmpty(run.getModuleIds())) {
 						executeLateralizableRefsetValidation(run, queryService);
 					}
 					break;
