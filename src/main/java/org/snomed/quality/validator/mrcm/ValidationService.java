@@ -383,7 +383,7 @@ public class ValidationService {
 			}
 			// it should be parentOf but the query service doesn't support childOf or parentOf yet.
 			List<Long> ancestors = queryService.eclQueryReturnConceptIdentifiers(">" + conceptId, 0, -1).getConceptIds();
-			if (ancestors.stream().noneMatch(memberOfLateralizbleRefset::contains)) {
+			if (ancestors.stream().noneMatch(concept -> memberOfLateralizbleRefset.contains(concept))) {
 				violatedConcepts.add(conceptId);
 			}
 		}
@@ -393,33 +393,33 @@ public class ValidationService {
 	private List<Long> processNonNestedDomainConstraintQuery(SnomedQueryService queryService, String attributeId,
 			List<Domain> domains, StringBuilder msgBuilder) throws ServiceException {
 		List<Long> violatedConcepts;
-		StringBuilder withAttributeButWrongDomainEcl = new StringBuilder("(*:" + attributeId + "=*) MINUS ");
+		String withAttributeButWrongDomainEcl = "(*:" + attributeId + "=*) MINUS ";
 		if (domains.size() > 1) {
-			withAttributeButWrongDomainEcl.append("(");
+			withAttributeButWrongDomainEcl += "(";
 		}
 		int counter = 0;
 		for (Domain domain : domains) {
 			if (counter++ > 0) {
-				withAttributeButWrongDomainEcl.append(" OR ");
+				withAttributeButWrongDomainEcl += " OR ";
 				msgBuilder.append(" OR ");
 			}
-			withAttributeButWrongDomainEcl.append(domain.getDomainConstraint());
+			withAttributeButWrongDomainEcl += domain.getDomainConstraint();
 			msgBuilder.append(domain.getDomainConstraint());
 		}
 		if (domains.size() > 1) {
-			withAttributeButWrongDomainEcl.append(")");
+			withAttributeButWrongDomainEcl += ")";
 		}
 		// run ECL query to retrieve failures
 		LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
-		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl.toString(), 0, -1).getConceptIds();
+		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
 		return violatedConcepts;
 	}
 
 	private void filterAttributeDomainByStrength(ValidationRun run, SnomedQueryService queryService, List<Long> precoordinatedTypes, String ruleStrengh,
-			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) {
+			Map<String, List<Domain>> attributeDomainMap, Map<String, List<Attribute>> attributesById) throws ServiceException {
 		for (Domain domain : run.getMRCMDomains().values()) {
 			for (Attribute attribute : domain.getAttributes()) {
-				// There are cases that domain rule is optional e.g. 723264001 for Laterality attribute
+				// There are cases that domain rule is optional e.g 723264001 for Laterality attribute
 				if(!ruleStrengh.equals(attribute.getRuleStrengthId())) {
 					continue;
 				}
@@ -472,7 +472,7 @@ public class ValidationService {
 				validateConceptsInRange(run, descriptions, queryService, attributeRange, "range rule", attributeRange.getRangeRule());
 
 				if (preCoordinatedTypes.contains(Long.parseLong(attributeRange.getContentTypeId()))) {
-					String outOfRangeRule;
+					String outOfRangeRule = null;
 					// check concrete attribute range constraint
 					if (isConcreteRangeConstraint(rangeConstraint)) {
 						String matchRangeRule = removeCardinality(attributeRange.getRangeRule());
@@ -497,7 +497,7 @@ public class ValidationService {
 	}
 
 	private void validateConceptsInRange(ValidationRun run, Map<Long, List<DescriptionImpl>> descriptions, SnomedQueryService queryService, Attribute attribute,
-			String column, String range) {
+			String column, String range) throws ServiceException {
 
 		List<ConceptImpl> concepts = getConceptsFromRange(range);
 		Set<ConceptImpl> notFoundConcepts = new HashSet<>();
@@ -542,7 +542,7 @@ public class ValidationService {
 
 		Assertion assertion;
 		String msg;
-		if (!notFoundConcepts.isEmpty()) {
+		if (notFoundConcepts.size() != 0) {
 			List<ConceptResult> currentViolatedConcepts = notFoundConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
@@ -550,7 +550,7 @@ public class ValidationService {
 			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
 			run.addCompletedAssertion(assertion);
 		}
-		if (!inactiveConcepts.isEmpty()) {
+		if (inactiveConcepts.size() != 0) {
 			List<ConceptResult> currentViolatedConcepts = inactiveConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "0", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
@@ -558,7 +558,7 @@ public class ValidationService {
 			assertion = new Assertion(attribute, ValidationType.ATTRIBUTE_RANGE, ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT, msg, FailureType.ERROR, currentViolatedConcepts, null, null);
 			run.addCompletedAssertion(assertion);
 		}
-		if (!invalidTermConcepts.isEmpty()) {
+		if (invalidTermConcepts.size() != 0) {
 			List<ConceptResult> currentViolatedConcepts = invalidTermConcepts.stream()
 					.map(concept -> new ConceptResult(concept.getId().toString(), null, "1", null, null, concept.getFsn(), null))
 					.collect(Collectors.toList());
@@ -660,7 +660,7 @@ public class ValidationService {
 		List<ConceptImpl> concepts = new ArrayList<>();
 		Matcher matcher = CONCEPT_TERM_PATTERN.matcher(range);
 		while (matcher.find()) {
-			String[] parts = matcher.group().split(" ", 2);
+			String parts[] = matcher.group().split(" ", 2);
 			String conceptId = parts[0].trim();
 			String term = parts[1].trim().substring(1, parts[1].trim().length() -1);
 			ConceptImpl concept = new ConceptImpl(conceptId);
@@ -670,7 +670,7 @@ public class ValidationService {
 		return concepts;
 	}
 
-	private static class MRCMFactory extends ImpotentComponentFactory {
+	private class MRCMFactory extends ImpotentComponentFactory {
 
 		private static final int proximalPrimitiveConstraint = 2;
 		private static final int attDomainIdIndex = 0;
@@ -679,36 +679,40 @@ public class ValidationService {
 		private static final int ranContentTypeIndex = 3;
 		public static final int attContentTypeIndex = 5;
 
-		private final Map<String, Domain> domains = new HashMap<>();
-		private final Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
-		private final Set<Long> ungroupedAttributes = new HashSet<>();
-		private final Set<Long> inUseConceptIds = new HashSet<>();
-		private final Set<ReferenceSetMember> lateralizableRefsets = new HashSet<>();
+		private Map<String, Domain> domains = new HashMap<>();
+		private Map<String, List<Attribute>> attributeRangeMap = new HashMap<>();
+		private Set<Long> ungroupedAttributes = new HashSet<>();
+		private Set<Long> inUseConceptIds = new HashSet<>();
+		private Set<ReferenceSetMember> lateralizableRefsets = new HashSet<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
 				if ("1".equals(active)) {
-                    switch (refsetId) {
-                        case MRCM_DOMAIN_REFSET ->
-                            // use proximal primitive domain constraint instead. see MRCM doc
-                                getCreateDomain(referencedComponentId).setDomainConstraint(otherValues[proximalPrimitiveConstraint]);
-                        case MRCM_ATTRIBUTE_DOMAIN_REFSET -> {
-                            Domain domain = getCreateDomain(otherValues[attDomainIdIndex]);
-                            Attribute attribute = createAttributeDomain(id, referencedComponentId, otherValues);
-                            domain.addAttribute(attribute);
-                            updateAttributeRange(attribute.getAttributeId(), domain);
-                            loadUngroupedAttributes(active, referencedComponentId, otherValues);
-                        }
-                        case MRCM_ATTRIBUTE_RANGE_REFSET -> {
-                            Attribute attributeRange = createAttributeRange(id, referencedComponentId, otherValues);
-                            addInUseConceptIds(attributeRange.getRangeRule());
-                            addInUseConceptIds(attributeRange.getRangeConstraint());
-                        }
-                        case LATERALIZABLE_BODY_STRUCTURE_REFSET ->
-                                lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, true, moduleId, refsetId, referencedComponentId));
-                        default -> LOGGER.error("Invalid refsetId {}", refsetId);
-                    }
+					switch (refsetId) {
+						case MRCM_DOMAIN_REFSET:
+							// use proximal primitive domain constraint instead. see MRCM doc
+							getCreateDomain(referencedComponentId).setDomainConstraint(otherValues[proximalPrimitiveConstraint]);
+							break;
+						case MRCM_ATTRIBUTE_DOMAIN_REFSET:
+							Domain domain = getCreateDomain(otherValues[attDomainIdIndex]);
+							Attribute attribute = createAttributeDomain(id, referencedComponentId, otherValues);
+							domain.addAttribute(attribute);
+							updateAttributeRange(attribute.getAttributeId(), domain);
+							loadUngroupedAttributes(active, referencedComponentId, otherValues);
+							break;
+						case MRCM_ATTRIBUTE_RANGE_REFSET:
+							Attribute attributeRange =createAttributeRange(id, referencedComponentId, otherValues);
+							addInUseConceptIds(attributeRange.getRangeRule());
+							addInUseConceptIds(attributeRange.getRangeConstraint());
+							break;
+						case LATERALIZABLE_BODY_STRUCTURE_REFSET:
+							lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, true, moduleId, refsetId, referencedComponentId));
+							break;
+						default:
+							LOGGER.error("Invalid refsetId {}", refsetId);
+							break;
+					}
 				}
 			}
 		}
@@ -805,7 +809,9 @@ public class ValidationService {
 
 		private void addInUseConceptIds(String range) {
 			List<ConceptImpl> concepts = getConceptsFromRange(range);
-			concepts.forEach(concept -> this.inUseConceptIds.add(concept.getId()));
+			concepts.forEach(concept -> {
+				this.inUseConceptIds.add(concept.getId());
+			});
 		}
 
 		public Set<Long> getInUseConceptIds() {
