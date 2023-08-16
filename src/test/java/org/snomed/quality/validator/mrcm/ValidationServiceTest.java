@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import com.google.common.collect.Sets;
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
@@ -47,7 +46,7 @@ public class ValidationServiceTest {
 				totalAttribute++;
 				assertNotNull("Range constraint can't be null for a given attribute.", domain.getAttributeRanges(attribute.getAttributeId()));
 				if (domain.getAttributeRanges(attribute.getAttributeId()).isEmpty()) {
-					assertTrue("Attribute must have at least one range constraint.", domain.getAttributeRanges(attribute.getAttributeId()).size() >= 1);
+                    assertFalse("Attribute must have at least one range constraint.", domain.getAttributeRanges(attribute.getAttributeId()).isEmpty());
 				}
 				for (Attribute range : domain.getAttributeRanges(attribute.getAttributeId())) {
 					totalAttributeRange++;
@@ -87,7 +86,7 @@ public class ValidationServiceTest {
 
 		assertEquals(273, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
-		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().collect(Collectors.toList());
+		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().toList();
 		assertEquals(expectedFailedMessages.toString(), actualFailedMessages.toString());
 	}
 

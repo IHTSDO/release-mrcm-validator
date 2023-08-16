@@ -29,15 +29,15 @@ public class LateralizableRefsetValidationService {
 		run.addCompletedAssertion(assertionOfConceptsToAdd);
 
 		if (!conceptsToRemove.isEmpty()) {
-			Set<ReferenceSetMember> membersToRemove = run.getLateralizableRefsetMembers().stream().filter(referenceSetMember -> (CollectionUtils.isEmpty(run.getModuleIds()) || !run.getModuleIds().contains(referenceSetMember.getModuleId())) && conceptsToRemove.contains(Long.valueOf(referenceSetMember.getReferencedComponentId()).longValue()))
+			Set<ReferenceSetMember> membersToRemove = run.getLateralizableRefsetMembers().stream().filter(referenceSetMember -> (CollectionUtils.isEmpty(run.getModuleIds()) || !run.getModuleIds().contains(referenceSetMember.moduleId())) && conceptsToRemove.contains(Long.valueOf(referenceSetMember.referencedComponentId())))
 					.collect(Collectors.toSet());
 			if (!membersToRemove.isEmpty()) {
-				assertionOfMembersToRemove.setCurrentViolatedReferenceSetMembers(membersToRemove.stream().map(ReferenceSetMember::getMemberId).collect(Collectors.toList()));
+				assertionOfMembersToRemove.setCurrentViolatedReferenceSetMembers(membersToRemove.stream().map(ReferenceSetMember::memberId).collect(Collectors.toList()));
 			}
 		}
 
 		if (!conceptsToAdd.isEmpty()) {
-			Set<String> allReferencedComponentIds = run.getLateralizableRefsetMembers().stream().map(ReferenceSetMember::getReferencedComponentId).collect(Collectors.toSet());
+			Set<String> allReferencedComponentIds = run.getLateralizableRefsetMembers().stream().map(ReferenceSetMember::referencedComponentId).collect(Collectors.toSet());
 			Set<Long> referencedComponentIdsToAdd = conceptsToAdd.stream().filter(conceptId -> !allReferencedComponentIds.contains(conceptId.toString())).collect(Collectors.toSet());
 			if (!referencedComponentIdsToAdd.isEmpty()) {
 				Set<Long> filteredReferencedComponentIdsToAdd ;
@@ -83,11 +83,11 @@ public class LateralizableRefsetValidationService {
 
 		// Exclude concepts that have the following semantic tags: cell/Cell structure/Morphologic abnormality
 		for (ReferenceSetMember member : run.getLateralizableRefsetMembers()) {
-			ConceptResult conceptResult = queryService.retrieveConcept(member.getReferencedComponentId());
+			ConceptResult conceptResult = queryService.retrieveConcept(member.referencedComponentId());
 			if (conceptResult != null) {
 				String fsn = conceptResult.getFsn();
 				if (fsn != null && (fsn.endsWith("(cell)") || fsn.endsWith("(cell structure)") || fsn.endsWith("(morphologic abnormality)"))) {
-					result.add(Long.parseLong(member.getReferencedComponentId()));
+					result.add(Long.parseLong(member.referencedComponentId()));
 				}
 			}
 		}
@@ -99,9 +99,8 @@ public class LateralizableRefsetValidationService {
 		// Concepts which have the laterality attribute with an appropriate value
 		String byLaterality = "( (<< 91723000 : 272741003 = 182353008) MINUS ( * : 272741003 = (7771000	 OR 24028007 OR 51440002) ) )  MINUS (^ 723264001)";
 
-		Set<Long> conceptsToAdd = new HashSet<>();
-		Set<Long> result = new HashSet<>();
-		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byLaterality));
+        Set<Long> result = new HashSet<>();
+        Set<Long> conceptsToAdd = new HashSet<>(getAllConceptsByECL(queryService, byLaterality));
 
 		// Concepts which are within a certain hierarchy and have an ancestor within the reference set
 		String byHierarchy = "(( << 91723000 MINUS (* : 272741003 = (7771000 OR 24028007 OR 51440002 )))  AND (<  (^ 723264001)))	MINUS (^ 723264001)";
@@ -121,9 +120,8 @@ public class LateralizableRefsetValidationService {
 		// Concepts which have the laterality attribute and have an appropriate ancestor.
 		String byLateralityAndHierarchy = "( ( ( << 91723000 |Anatomical structure (body structure)| : 272741003 | Laterality (attribute) | = 182353008 |Side (qualifier value)|) MINUS ( * : 272741003 | Laterality (attribute) | = (7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) OR ( ( ( << 91723000 |Anatomical structure (body structure)|) AND ( < (^ 723264001) ) ) MINUS ( * : 272741003 | Laterality (attribute) | = ( 7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) )";
 
-		Set<Long> conceptsToAdd = new HashSet<>();
-		Set<Long> result = new HashSet<>();
-		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byLateralityAndHierarchy));
+        Set<Long> result = new HashSet<>();
+        Set<Long> conceptsToAdd = new HashSet<>(getAllConceptsByECL(queryService, byLateralityAndHierarchy));
 
 		for (Long conceptId : conceptsToAdd) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());

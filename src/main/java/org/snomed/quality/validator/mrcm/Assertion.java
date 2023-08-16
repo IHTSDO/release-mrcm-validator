@@ -10,10 +10,10 @@ import org.snomed.quality.validator.mrcm.model.Attribute;
 import org.springframework.util.CollectionUtils;
 
 public class Assertion {
-	public static enum FailureType {
+	public enum FailureType {
 		ERROR("error"),
 		WARNING("warning");
-		String value;
+		final String value;
 		
 		FailureType(String value) {
 			this.value = value;
@@ -32,9 +32,9 @@ public class Assertion {
 	private List<Long> previousViolatedConceptIds;
 	private List<ConceptResult> previousViolatedConcepts;
 	private final String message;
-	private ValidationType validationType;
+	private final ValidationType validationType;
 	private ValidationSubType validationSubType;
-	private FailureType failureType;
+	private final FailureType failureType;
 	private String domainConstraint;
 
 	public Assertion(UUID uuid, ValidationType type, String msg, FailureType failureType) {
@@ -127,19 +127,13 @@ public class Assertion {
 	
 	public boolean reportAsError() {
 		//default to error
-		if (FailureType.WARNING == failureType ) {
-			return false;
-		}
-		return true;
-	}
+        return FailureType.WARNING != failureType;
+    }
 	
 	public boolean reportAsWarning() {
 		//default to error
-		if (FailureType.WARNING == failureType ) {
-			return true;
-		}
-		return false;
-	}
+        return FailureType.WARNING == failureType;
+    }
 	
 	public String getAssertionText() {
 		if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
@@ -210,11 +204,12 @@ public class Assertion {
 	}
 
 	private String getFailureCardinalityMessage(String cardinality) {
-		char minCardinality = getMinCaridinality(cardinality);
-		char maxCardinality = getMaxCaridinality(cardinality);
+		char minCardinality = getMinCardinality(cardinality);
+		char maxCardinality = getMaxCardinality(cardinality);
 
+		boolean isMaxGreaterThanMin = Character.getNumericValue(maxCardinality) > Character.getNumericValue(minCardinality);
 		if (minCardinality == '0') {
-			if (maxCardinality != '*' && Character.getNumericValue(maxCardinality) > Character.getNumericValue(minCardinality)) {
+			if (maxCardinality != '*' && isMaxGreaterThanMin) {
 				return "more than " + maxCardinality;
 			}
 		}
@@ -223,18 +218,18 @@ public class Assertion {
 				return "less than " + minCardinality;
 			} else if (minCardinality == maxCardinality) {
 				return  "more than " + minCardinality + " or don't have " + minCardinality + " at all";
-			} else if (Character.getNumericValue(maxCardinality) > Character.getNumericValue(minCardinality)) {
+			} else if (isMaxGreaterThanMin) {
 				return "less than " + minCardinality + " or more than " + maxCardinality;
 			}
 		}
 		return  "";
 	}
 
-	private char getMinCaridinality(String cardinality) {
+	private char getMinCardinality(String cardinality) {
 		return cardinality.charAt(0);
 	}
 
-	private char getMaxCaridinality(String cardinality) {
+	private char getMaxCardinality(String cardinality) {
 		return cardinality.charAt(cardinality.length() - 1);
 	}
 
@@ -306,10 +301,8 @@ public class Assertion {
 				return false;
 		} else if (!uuid.equals(other.uuid))
 			return false;
-		if (validationType != other.validationType)
-			return false;
-		return true;
-	}
+        return validationType == other.validationType;
+    }
 	
 	
 }

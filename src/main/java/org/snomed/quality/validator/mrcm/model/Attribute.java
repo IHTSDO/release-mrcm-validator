@@ -3,7 +3,7 @@ package org.snomed.quality.validator.mrcm.model;
 import java.util.UUID;
 
 public class Attribute {
-	public static enum Type {DOMAIN, RANGE};
+	public enum Type {DOMAIN, RANGE}
 
 	private UUID uuid;
 
@@ -77,7 +77,7 @@ public class Attribute {
 	}
 
 	public void setGrouped(String grouped) {
-		this.isGrouped = "1".equals(grouped) ? true:false;
+		this.isGrouped = "1".equals(grouped);
 	}
 
 	public String getAttributeCardinality() {
@@ -115,7 +115,8 @@ public class Attribute {
 		 result += ", rangeConstraint=" + rangeConstraint;
 		 result += ", rangeRule=" + rangeRule;
 	 } 
-	 return  result +=']';
+	 result +=']';
+	 return result;
 	}
 
 	@Override
@@ -174,10 +175,8 @@ public class Attribute {
 				return false;
 		} else if (!ruleStrengthId.equals(other.ruleStrengthId))
 			return false;
-		if (type != other.type)
-			return false;
-		return true;
-	}
+        return type == other.type;
+    }
 
 	public Type getType() {
 		return this.type;

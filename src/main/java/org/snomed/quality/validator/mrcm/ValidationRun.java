@@ -33,85 +33,85 @@ public final class ValidationRun {
 		this.reportSkippedAssertions = reportSkippedAssertions;
 	}
 
-	public final List<ValidationType> getValidationTypes() {
+	public List<ValidationType> getValidationTypes() {
 		return validationTypes;
 	}
 
-	public final void setValidationTypes(final List<ValidationType> validationTypes) {
+	public void setValidationTypes(final List<ValidationType> validationTypes) {
 		this.validationTypes = validationTypes;
 	}
 
-	public final void setMRCMDomains(final Map<String, Domain> mrcmDomains) {
+	public void setMRCMDomains(final Map<String, Domain> mrcmDomains) {
 		this.mrcmDomains = mrcmDomains;
 	}
 
-	public final Map<String, Domain> getMRCMDomains() {
+	public Map<String, Domain> getMRCMDomains() {
 		return mrcmDomains;
 	}
 
-	public final Map<String, List<Attribute>> getAttributeRangesMap() {
+	public Map<String, List<Attribute>> getAttributeRangesMap() {
 		return attributeRangesMap;
 	}
 
-	public final void setAttributeRangesMap(final Map<String, List<Attribute>> attributeRangesMap) {
+	public void setAttributeRangesMap(final Map<String, List<Attribute>> attributeRangesMap) {
 		this.attributeRangesMap = attributeRangesMap;
 	}
 
-	public final void addSkippedAssertion(final Assertion skippedAssertion) {
+	public void addSkippedAssertion(final Assertion skippedAssertion) {
 		if (reportSkippedAssertions) {
 			assertionSkipped.add(skippedAssertion);
 		}
 	}
 
-	public final void addCompletedAssertion(final Assertion completedAssertion) {
+	public void addCompletedAssertion(final Assertion completedAssertion) {
 		assertionsCompleted.add(completedAssertion);
 	}
 
-	public final Set<Assertion> getFailedAssertions() {
+	public Set<Assertion> getFailedAssertions() {
 		return assertionsCompleted.stream().filter(Assertion::reportAsError).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
 
-	public final Set<Assertion> getPassedAssertions() {
+	public Set<Assertion> getPassedAssertions() {
 		return assertionsCompleted.stream().filter(Assertion::invalidConceptsNotFound).collect(Collectors.toSet());
 	}
 
-	public final Set<Assertion> getAssertionsWithWarning() {
+	public Set<Assertion> getAssertionsWithWarning() {
 		return assertionsCompleted.stream().filter(Assertion::reportAsWarning).filter(Assertion::invalidConceptsFound).collect(Collectors.toSet());
 	}
 
-	public final List<Assertion> getCompletedAssertions() {
+	public List<Assertion> getCompletedAssertions() {
 		return assertionsCompleted;
 	}
 
-	public final List<Assertion> getSkippedAssertions() {
+	public List<Assertion> getSkippedAssertions() {
 		return assertionSkipped;
 	}
 
-	public final String getReleaseDate() {
+	public String getReleaseDate() {
 		return releaseDate;
 	}
 
-	public final ContentType getContentType() {
+	public ContentType getContentType() {
 		return contentType;
 	}
 
-	public final void setUngroupedAttributes(final Set<Long> ungroupedAttributes) {
+	public void setUngroupedAttributes(final Set<Long> ungroupedAttributes) {
 		this.ungroupedAttributes = ungroupedAttributes;
 	}
 
-	public final Set<Long> getUngroupedAttributes() {
+	public Set<Long> getUngroupedAttributes() {
 		return ungroupedAttributes;
 	}
 
-	public final Set<Long> getConceptsUsedInMRCMTemplates() {
+	public Set<Long> getConceptsUsedInMRCMTemplates() {
 		return conceptsUsedInMRCMTemplates;
 	}
 
-	public final void setConceptsUsedInMRCMTemplates(Set<Long> conceptsUsedInMRCMTemplates) {
+	public void setConceptsUsedInMRCMTemplates(Set<Long> conceptsUsedInMRCMTemplates) {
 		this.conceptsUsedInMRCMTemplates = conceptsUsedInMRCMTemplates;
 	}
 
-	public final boolean reportSkippedAssertions() {
+	public boolean reportSkippedAssertions() {
 		return reportSkippedAssertions;
 	}
 
@@ -140,7 +140,7 @@ public final class ValidationRun {
 	}
 
 	@Override
-	public final boolean equals(final Object o) {
+	public boolean equals(final Object o) {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		ValidationRun that = (ValidationRun) o;
@@ -156,7 +156,7 @@ public final class ValidationRun {
 	}
 
 	@Override
-	public final int hashCode() {
+	public int hashCode() {
 		return Objects.hash(validationTypes, mrcmDomains, attributeRangesMap, assertionsCompleted, assertionSkipped,
 				releaseDate, contentType, ungroupedAttributes, reportSkippedAssertions);
 	}

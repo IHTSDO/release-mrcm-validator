@@ -7,7 +7,7 @@ import java.util.Set;
 
 public class Domain {
 
-	private String domainId;
+	private final String domainId;
 	private String domainConstraint;
 	private final Set<Attribute> attributes;
 	private final Map<String,Set<Attribute>> attributeRanges;

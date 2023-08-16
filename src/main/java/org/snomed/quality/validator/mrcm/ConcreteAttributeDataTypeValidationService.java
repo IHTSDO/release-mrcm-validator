@@ -51,7 +51,7 @@ public class ConcreteAttributeDataTypeValidationService {
 
 		// Add assertions for all concrete attributes defined in the MRCM
 		attributeRangeMap.values().forEach(attribute -> {
-			Assertion assertion = null;
+			Assertion assertion;
 			if (componentFactory.getAttributeToViolatedConceptsMap().containsKey(attribute.getAttributeId())) {
 				List<Long> conceptIds = new ArrayList<>(componentFactory.getAttributeToViolatedConceptsMap().get(attribute.getAttributeId()));
 				String failureMsg = componentFactory.getAttributeToFailureMsgMap().get(attribute.getAttributeId());
@@ -136,7 +136,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		}
 
 		private String constructFailureMessage(String conceptId, String attributeId, final String prefix, final String value, final Type dataType) {
-			return String.format(TYPE_NOT_MATCHING_MSG_FORMAT, prefix, value, dataType, conceptId);
+			return String.format(TYPE_NOT_MATCHING_MSG_FORMAT, prefix, value, dataType);
 		}
 
 		@Override
@@ -164,7 +164,7 @@ public class ConcreteAttributeDataTypeValidationService {
 				if (dataTypeInMRCM == null) {
 					if (!attributeToFailureMsgMap.containsKey(typeId)) {
 						attributeToFailureMsgMap.put(typeId, String.format(NO_DATA_TYPE_DEFINED_MSG_FORMAT, AXIOM_LABEL,
-								relationship.getValue().getRF2Value(), axiom.getLeftHandSideNamedConcept()));
+								relationship.getValue().getRF2Value()));
 						attributeToViolatedConceptsMap.computeIfAbsent(typeId, k -> new HashSet<>()).add(Long.parseLong(String.valueOf(axiom.getLeftHandSideNamedConcept())));
 					}
 				} else if (relationship.getValue().getType() != dataTypeInMRCM) {
