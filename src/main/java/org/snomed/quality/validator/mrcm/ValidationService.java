@@ -104,7 +104,7 @@ public class ValidationService {
 
 		//checking data is loaded properly
 		LOGGER.info("Total concepts loaded {}", queryService.getConceptCount());
-		List<Long> preCoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT, 0, 100).getConceptIds();
+		List<Long> preCoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT, 0, 100).conceptIds();
 		Assert.notEmpty(preCoordinatedTypes, "Concept " + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT + " and descendants must be accessible.");
 		for (ValidationType type : run.getValidationTypes()) {
             switch (type) {
@@ -192,10 +192,10 @@ public class ValidationService {
 					String eclWithoutCardinality = domainPartEcl + "[0..*]" + " { [0..*] " + attributePartEcl + " }";
 					//run ECL query to retrieve failures
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without group cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
-					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
+					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).conceptIds();
 					String eclWithCardinality = domainPartEcl + "[" + attribute.getAttributeCardinality() + "]" + "{ [" + attribute.getAttributeInGroupCardinality() + "] " + attributePartEcl + "}";
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
-					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
+					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).conceptIds();
 					List<Long> invalidIds = new ArrayList<>();
 					if (conceptIdsWithoutCardinality.size() != conceptIdsWithCardinality.size()) {
 						invalidIds = conceptIdsWithoutCardinality;
@@ -276,10 +276,10 @@ public class ValidationService {
 					String eclWithoutCardinality = domainConstraint +  attributeWithoutRange;
 					//run ECL query to retrieve failures
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' without cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithoutCardinality);
-					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).getConceptIds();
+					List<Long> conceptIdsWithoutCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithoutCardinality, 0, -1).conceptIds();
 					String eclWithCardinality = domainConstraint + " [" + attribute.getAttributeCardinality() + "] " + attributeWithoutRange;
 					LOGGER.info("Selecting content within domain '{}' with attribute '{}' with cardinality ECL:'{}'", domain.getDomainId(), attribute.getAttributeId(), eclWithCardinality);
-					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).getConceptIds();
+					List<Long> conceptIdsWithCardinality = queryService.eclQueryReturnConceptIdentifiers(eclWithCardinality, 0, -1).conceptIds();
 					List<Long> invalidIds = new ArrayList<>();
 					if (conceptIdsWithoutCardinality.size() != conceptIdsWithCardinality.size()) {
 						invalidIds = conceptIdsWithoutCardinality;
@@ -367,11 +367,11 @@ public class ValidationService {
 		// I think the domain constraint should be childOrSelfOf <<! ^ 723264001 but the query service doesn't support childOf or parentOf yet.
 
 		String withAttributeQuery = "*:" + attributeId + "=*";
-		List<Long> conceptsWithAttribute = queryService.eclQueryReturnConceptIdentifiers(withAttributeQuery, 0, -1).getConceptIds();
+		List<Long> conceptsWithAttribute = queryService.eclQueryReturnConceptIdentifiers(withAttributeQuery, 0, -1).conceptIds();
 		List<Long> memberOfLateralizbleRefset = new ArrayList<>();
 		for (Domain domain : domains) {
 			if (domain.getDomainId().equals(LATERALIZABLE_BODY_STRUCTURE_REFSET)) {
-				List<Long> result = queryService.eclQueryReturnConceptIdentifiers(domain.getDomainConstraint(), 0, -1).getConceptIds();
+				List<Long> result = queryService.eclQueryReturnConceptIdentifiers(domain.getDomainConstraint(), 0, -1).conceptIds();
 				memberOfLateralizbleRefset.addAll(result);
 				msgBuilder.append(domain.getDomainConstraint());
 			}
@@ -382,7 +382,7 @@ public class ValidationService {
 				continue;
 			}
 			// it should be parentOf but the query service doesn't support childOf or parentOf yet.
-			List<Long> ancestors = queryService.eclQueryReturnConceptIdentifiers(">" + conceptId, 0, -1).getConceptIds();
+			List<Long> ancestors = queryService.eclQueryReturnConceptIdentifiers(">" + conceptId, 0, -1).conceptIds();
 			if (ancestors.stream().noneMatch(concept -> memberOfLateralizbleRefset.contains(concept))) {
 				violatedConcepts.add(conceptId);
 			}
@@ -411,7 +411,7 @@ public class ValidationService {
 		}
 		// run ECL query to retrieve failures
 		LOGGER.info("Selecting content within domain '{}' with attribute '{}' with any range using expression '{}'", domains.toArray(), attributeId, withAttributeButWrongDomainEcl);
-		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).getConceptIds();
+		violatedConcepts = queryService.eclQueryReturnConceptIdentifiers(withAttributeButWrongDomainEcl, 0, -1).conceptIds();
 		return violatedConcepts;
 	}
 
@@ -487,7 +487,7 @@ public class ValidationService {
 								: outOfRangeRule + rangeConstraint;
 					}
 					LOGGER.info("Selecting content out of range for attribute '{}' with out range constraint expression '{}'", attributeId, outOfRangeRule);
-					List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(outOfRangeRule, 0, -1).getConceptIds();
+					List<Long> conceptIdsWithInvalidAttributeValue = queryService.eclQueryReturnConceptIdentifiers(outOfRangeRule, 0, -1).conceptIds();
 					processValidationResults(run, queryService, attributeRange, conceptIdsWithInvalidAttributeValue, ValidationType.ATTRIBUTE_RANGE, null);
 				} else {
 					run.addSkippedAssertion(constructAssertion(queryService, attributeRange, ValidationType.ATTRIBUTE_RANGE, "content type:" + attributeRange.getContentTypeId() + " is out of scope."));

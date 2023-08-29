@@ -95,7 +95,7 @@ public class ValidationServiceTest {
 		final SnomedQueryService queryService = validationService.getSnomedQueryService(Collections.singleton(testReleaseFiles.getPath()), ContentType.INFERRED, new ValidationService.OWLExpressionAndDescriptionFactory(new ComponentStore(),
 				Collections.emptySet(), Collections.emptySet()), true);
 
-		assertEquals(Sets.newHashSet(404684003L, 39302008L), new HashSet<>(queryService.eclQueryReturnConceptIdentifiers("> 29857009", 0, 100).getConceptIds()));
+		assertEquals(Sets.newHashSet(404684003L, 39302008L), new HashSet<>(queryService.eclQueryReturnConceptIdentifiers("> 29857009", 0, 100).conceptIds()));
 	}
 
 	@Test

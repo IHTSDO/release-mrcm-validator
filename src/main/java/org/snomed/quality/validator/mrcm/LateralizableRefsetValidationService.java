@@ -135,6 +135,6 @@ public class LateralizableRefsetValidationService {
 
 	private List<Long> getAllConceptsByECL(SnomedQueryService queryService, String ecl) throws ServiceException {
 		ConceptIdResults results = queryService.eclQueryReturnConceptIdentifiers(ecl, 0, -1);
-		return results.getConceptIds();
+		return results.conceptIds();
 	}
 }
