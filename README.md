@@ -8,9 +8,16 @@ MRCM refsets are part of International Releases since 20170731. The Release MRCM
 ## Quick Start
 Use Maven to build the executable stand-alone jar and run:
 ```bash
-mvn clean package
-
-java -Xmx4g -jar target/mrcm-validator-*-jar-with-dependencies.jar {release_package_unzipped_root_dir} {is_stated_only} {release_date} {result_dir}
+mvn clean package \
+        -DskipTests \
+        -Ddependency-check.skip=true && \
+    java -Xmx4g \
+        --add-opens java.base/java.lang=ALL-UNNAMED \
+        -jar target/mrcm-validator-*-jar-with-dependencies.jar \
+            {release_package_unzipped_root_dir} \
+            {is_stated_only} \
+            {release_date} \
+            {result_dir}
 ```
 
 ### Configuration options
