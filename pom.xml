@@ -14,6 +14,32 @@
     </parent>
 
     <dependencies>
+       <dependency>
+           <groupId>org.apache.lucene</groupId>
+           <artifactId>lucene-core</artifactId>
+           <version>8.11.2</version>
+       </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-queries</artifactId>
+            <version>8.11.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-queryparser</artifactId>
+            <version>8.11.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-sandbox</artifactId>
+            <version>8.11.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-join</artifactId>
+            <version>8.11.2</version>
+        </dependency>
+
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-runtime</artifactId>
@@ -41,7 +67,7 @@
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
+            <artifactId>slf4j-reload4j</artifactId>
         </dependency>
     </dependencies>
 
@@ -83,6 +109,12 @@
 
     <build>
         <plugins>
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-resources-plugin</artifactId>
+                 <version>3.3.1</version>
+             </plugin>
+
             <!-- Add the Add-Opens to the manifest file to allow snomed-owl-toolkit to work with java 17. Remove this when the owl-api is updatedversion 5-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -115,7 +147,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>2.4.1</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>generator-assembly</id>
