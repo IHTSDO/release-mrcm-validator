@@ -2,6 +2,7 @@ package org.snomed.quality.validator.mrcm;
 
 import org.ihtsdo.otf.snomedboot.ReleaseImportException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import static org.snomed.quality.validator.mrcm.Constants.*;
 import static org.snomed.quality.validator.mrcm.ContentType.INFERRED;
 import static org.snomed.quality.validator.mrcm.ContentType.STATED;
 
+@SpringBootApplication
 public class Application {
 
 	public static void main(final String[] args) throws Exception {
