@@ -83,12 +83,16 @@ public class LateralizableRefsetValidationService {
 
 		// Exclude concepts that have the following semantic tags: cell/Cell structure/Morphologic abnormality
 		for (ReferenceSetMember member : run.getLateralizableRefsetMembers()) {
-			ConceptResult conceptResult = queryService.retrieveConcept(member.referencedComponentId());
-			if (conceptResult != null) {
-				String fsn = conceptResult.getFsn();
-				if (fsn != null && (fsn.endsWith("(cell)") || fsn.endsWith("(cell structure)") || fsn.endsWith("(morphologic abnormality)"))) {
-					result.add(Long.parseLong(member.referencedComponentId()));
+			try {
+				ConceptResult conceptResult = queryService.retrieveConcept(member.referencedComponentId());
+				if (conceptResult != null) {
+					String fsn = conceptResult.getFsn();
+					if (fsn != null && (fsn.endsWith("(cell)") || fsn.endsWith("(cell structure)") || fsn.endsWith("(morphologic abnormality)"))) {
+						result.add(Long.parseLong(member.referencedComponentId()));
+					}
 				}
+			} catch (ConceptNotFoundException e) {
+				result.add(Long.parseLong(member.referencedComponentId()));
 			}
 		}
 		return result;
