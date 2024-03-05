@@ -15,6 +15,7 @@ public final class ValidationRun {
 	private Map<String, List<Attribute>> attributeRangesMap;
 	private final List<Assertion> assertionsCompleted;
 	private final List<Assertion> assertionSkipped;
+	private final List<Assertion> assertionsIncomplete;
 	private final String releaseDate;
 	private final ContentType contentType;
 	private Set<Long> ungroupedAttributes;
@@ -25,6 +26,7 @@ public final class ValidationRun {
 
 	public ValidationRun(final String releaseDate, final ContentType contentType, final boolean reportSkippedAssertions) {
 		assertionsCompleted = new ArrayList<>();
+		assertionsIncomplete = new ArrayList<>();
 		validationTypes = Arrays.asList(ValidationType.values());
 		assertionSkipped = new ArrayList<>();
 		this.releaseDate = releaseDate;
@@ -65,6 +67,14 @@ public final class ValidationRun {
 
 	public void addCompletedAssertion(final Assertion completedAssertion) {
 		assertionsCompleted.add(completedAssertion);
+	}
+
+	public void addIncompleteAssertion(final Assertion incompleteAssertion) {
+		assertionsIncomplete.add(incompleteAssertion);
+	}
+
+	public Set<Assertion> getIncompleteAssertions() {
+		return new HashSet<>(assertionsIncomplete);
 	}
 
 	public Set<Assertion> getFailedAssertions() {

@@ -36,6 +36,7 @@ public class Assertion {
 	private ValidationSubType validationSubType;
 	private final FailureType failureType;
 	private String domainConstraint;
+	private String failureMessage;
 
 	public Assertion(UUID uuid, ValidationType type, String msg, FailureType failureType) {
 		this.uuid =uuid;
@@ -203,6 +204,14 @@ public class Assertion {
 		return detail;
 	}
 
+	public String getFailureMessage() {
+		return failureMessage;
+	}
+
+	public void setFailureMessage(String failureMessage) {
+		this.failureMessage = failureMessage;
+	}
+
 	private String getFailureCardinalityMessage(String cardinality) {
 		char minCardinality = getMinCardinality(cardinality);
 		char maxCardinality = getMaxCardinality(cardinality);
@@ -262,6 +271,8 @@ public class Assertion {
 	public String getMessage() {
 		return message;
 	}
+
+
 
 	@Override
 	public int hashCode() {
