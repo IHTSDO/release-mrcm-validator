@@ -15,6 +15,9 @@ import java.util.stream.Collectors;
 
 public class LateralizableRefsetValidationService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(LateralizableRefsetValidationService.class);
+	private static final String ECL_RULE_FOR_MEMBERSHIP = "(<< 423857001 |Structure of half of body lateral to midsagittal plane (body structure)| MINUS ( * : 272741003 | Laterality (attribute) | = (7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)|) ))";
+	private static final String ECL_TO_ADD_MEMBERSHIP = ECL_RULE_FOR_MEMBERSHIP + " MINUS (^ 723264001)";
+	private static final String ECL_TO_REMOVE_MEMBERSHIP = "(^ 723264001) MINUS " + ECL_RULE_FOR_MEMBERSHIP;
 
 	public static final String ASSERTION_ID_MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET = "64c8d4e7-4d8e-4f94-a7f0-ee8f2b162fbf";
 	public static final String MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET_TEXT = "The refset members need to be inactivated/removed from Lateralizable reference set";
@@ -23,6 +26,7 @@ public class LateralizableRefsetValidationService {
 	public static final String CONCEPTS_NEED_TO_BE_ADDED_TO_LATERALIZABLE_REFSET_TEXT = "The concepts need to be added to Lateralizable reference set";
 
 	public void validate(SnomedQueryService queryService, ValidationRun run) {
+		LOGGER.info("Validating 723264001 |Lateralizable body structure reference set|");
 		Assertion assertionOfMembersToRemove = new Assertion(UUID.fromString(ASSERTION_ID_MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET), ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE, MEMBERS_NEED_TO_BE_REMOVED_FROM_LATERALIZABLE_REFSET_TEXT, Assertion.FailureType.ERROR);
 		try {
 			Set<Long> conceptsToRemove = getRelevantConceptsToRemove(queryService, run);
@@ -47,19 +51,8 @@ public class LateralizableRefsetValidationService {
 	}
 
 	private Set<Long> getRelevantConceptsToRemove(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
-		// Concepts which have been lateralised
-		String byLaterality = "(^ 723264001 AND << 91723000) : (272741003 = (7771000 OR 24028007 OR 51440002))";
-
-		// Concepts which no longer have an appropriate prerequisite ancestor
-		String byNoPrerequisiteAncestor = "^ 723264001 MINUS (^ 723264001 AND << 423857001)";
-
-		Set<Long> conceptsToRemove = new HashSet<>();
-		Set<Long> result = new HashSet<>();
-		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byLaterality));
-		conceptsToRemove.addAll(getAllConceptsByECL(queryService, byNoPrerequisiteAncestor));
-
-		// Do not remove Concepts if they are also being added
-		getAllConceptsToAdd(queryService, run).forEach(conceptsToRemove::remove);
+        Set<Long> result = new HashSet<>();
+        Set<Long> conceptsToRemove = new HashSet<>(getAllConceptsByECL(queryService, ECL_TO_REMOVE_MEMBERSHIP));
 
 		for (Long conceptId : conceptsToRemove) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
@@ -82,37 +75,15 @@ public class LateralizableRefsetValidationService {
 				result.add(Long.parseLong(member.referencedComponentId()));
 			}
 		}
+
+		LOGGER.info("{} Concepts IDENTIFIED for removal from lateralisable reference set.", conceptsToRemove.size());
+		LOGGER.info("{} Concepts REPORTED for removal from lateralisable reference set.", result.size());
 		return result;
 	}
 
-	// Find Concepts which should be added to reference set. Concepts already in the reference set are excluded.
 	private Set<Long> getRelevantConceptsToAdd(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
-		// Concepts which have the laterality attribute with an appropriate value
-		String byLaterality = "( (<< 91723000 : 272741003 = 182353008) MINUS ( * : 272741003 = (7771000	 OR 24028007 OR 51440002) ) )  MINUS (^ 723264001)";
-
-        Set<Long> result = new HashSet<>();
-        Set<Long> conceptsToAdd = new HashSet<>(getAllConceptsByECL(queryService, byLaterality));
-
-		// Concepts which are within a certain hierarchy and have an ancestor within the reference set
-		String byHierarchy = "(( << 91723000 MINUS (* : 272741003 = (7771000 OR 24028007 OR 51440002 )))  AND (<  (^ 723264001)))	MINUS (^ 723264001)";
-		conceptsToAdd.addAll(getAllConceptsByECL(queryService, byHierarchy));
-
-		for (Long conceptId : conceptsToAdd) {
-			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
-			if (conceptResult.getEffectiveTime().equals(run.getReleaseDate())) {
-				result.add(conceptId);
-			}
-		}
-		return result;
-	}
-
-	// Find Concepts which should be added to reference set. Concepts already in the reference set are included.
-	private Set<Long> getAllConceptsToAdd(SnomedQueryService queryService, ValidationRun run) throws ServiceException {
-		// Concepts which have the laterality attribute and have an appropriate ancestor.
-		String byLateralityAndHierarchy = "( ( ( << 91723000 |Anatomical structure (body structure)| : 272741003 | Laterality (attribute) | = 182353008 |Side (qualifier value)|) MINUS ( * : 272741003 | Laterality (attribute) | = (7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) OR ( ( ( << 91723000 |Anatomical structure (body structure)|) AND ( < (^ 723264001) ) ) MINUS ( * : 272741003 | Laterality (attribute) | = ( 7771000 |Left (qualifier value)| OR 24028007 |Right (qualifier value)| OR 51440002 |Right and left (qualifier value)| ) ) ) )";
-
-        Set<Long> result = new HashSet<>();
-        Set<Long> conceptsToAdd = new HashSet<>(getAllConceptsByECL(queryService, byLateralityAndHierarchy));
+		Set<Long> result = new HashSet<>();
+		Set<Long> conceptsToAdd = new HashSet<>(getAllConceptsByECL(queryService, ECL_TO_ADD_MEMBERSHIP));
 
 		for (Long conceptId : conceptsToAdd) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
@@ -121,6 +92,8 @@ public class LateralizableRefsetValidationService {
 			}
 		}
 
+		LOGGER.info("{} Concepts IDENTIFIED for addition to lateralisable reference set.", conceptsToAdd.size());
+		LOGGER.info("{} Concepts REPORTED for addition to lateralisable reference set.", result.size());
 		return result;
 	}
 
