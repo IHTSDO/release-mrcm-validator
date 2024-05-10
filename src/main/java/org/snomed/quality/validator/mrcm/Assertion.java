@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.snomed.quality.validator.mrcm.model.Attribute;
+import org.snomed.quality.validator.mrcm.model.ReferenceSetMember;
 import org.springframework.util.CollectionUtils;
 
 public class Assertion {
@@ -28,7 +29,7 @@ public class Assertion {
 	private Attribute attribute;
 	private List<Long> currentViolatedConceptIds;
 	private List<ConceptResult> currentViolatedConcepts;
-	private List<String> currentViolatedReferenceSetMembers;
+	private List<ReferenceSetMember> currentViolatedReferenceSetMembers;
 	private List<Long> previousViolatedConceptIds;
 	private List<ConceptResult> previousViolatedConcepts;
 	private final String message;
@@ -91,11 +92,11 @@ public class Assertion {
 		this.currentViolatedConcepts = currentViolatedConcepts;
 	}
 
-	public List<String> getCurrentViolatedReferenceSetMembers() {
+	public List<ReferenceSetMember> getCurrentViolatedReferenceSetMembers() {
 		return currentViolatedReferenceSetMembers;
 	}
 
-	public void setCurrentViolatedReferenceSetMembers(List<String> currentViolatedReferenceSetMembers) {
+	public void setCurrentViolatedReferenceSetMembers(List<ReferenceSetMember> currentViolatedReferenceSetMembers) {
 		this.currentViolatedReferenceSetMembers = currentViolatedReferenceSetMembers;
 	}
 

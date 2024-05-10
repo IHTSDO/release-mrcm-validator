@@ -688,7 +688,7 @@ public class ValidationService {
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
-				if ("1".equals(active)) {
+				if ("1".equals(active) || LATERALIZABLE_BODY_STRUCTURE_REFSET.equals(refsetId)) {
 					switch (refsetId) {
 						case MRCM_DOMAIN_REFSET:
 							// use proximal primitive domain constraint instead. see MRCM doc
@@ -707,7 +707,7 @@ public class ValidationService {
 							addInUseConceptIds(attributeRange.getRangeConstraint());
 							break;
 						case LATERALIZABLE_BODY_STRUCTURE_REFSET:
-							lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, true, moduleId, refsetId, referencedComponentId));
+							lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, "1".equals(active), moduleId, refsetId, referencedComponentId));
 							break;
 						default:
 							LOGGER.error("Invalid refsetId {}", refsetId);
