@@ -57,6 +57,7 @@ public class ValidationService {
 			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET, LATERALIZABLE_BODY_STRUCTURE_REFSET)
 			.withIncludedReferenceSetFilenamePattern(".*MRCM.*")
 			.withIncludedReferenceSetFilenamePattern(".*_Refset_Simple.*")
+			.withInactiveRefsetMembers()
 			.withJustRefsets();
 
 	public final void loadMRCM(final File sourceDirectory, final ValidationRun run) throws ReleaseImportException {

@@ -58,7 +58,7 @@ public class LateralizableRefsetValidationService {
 		for (Long conceptId : conceptsToRemove) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
 			boolean conceptMatches = conceptResult.getEffectiveTime().equals(run.getReleaseDate());
-			boolean memberMatches = getNullable(membersByConceptId, String.valueOf(conceptId)).stream().anyMatch(r -> Objects.equals(r.effectiveTime(), run.getReleaseDate()));
+			boolean memberMatches = membersByConceptId.getOrDefault(String.valueOf(conceptId), Collections.emptyList()).stream().filter(ReferenceSetMember::active).anyMatch(r -> Objects.equals(r.effectiveTime(), run.getReleaseDate()));
 			if (conceptMatches || memberMatches) {
 				result.add(conceptId);
 			}
@@ -66,6 +66,10 @@ public class LateralizableRefsetValidationService {
 
 		// Exclude concepts that have the following semantic tags: cell/Cell structure/Morphologic abnormality
 		for (ReferenceSetMember member : run.getLateralizableRefsetMembers()) {
+			if (!member.active()) {
+				continue;
+			}
+
 			try {
 				ConceptResult conceptResult = queryService.retrieveConcept(member.referencedComponentId());
 				if (conceptResult != null) {
@@ -91,7 +95,7 @@ public class LateralizableRefsetValidationService {
 		for (Long conceptId : conceptsToAdd) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
 			boolean conceptMatches = conceptResult.getEffectiveTime().equals(run.getReleaseDate());
-			boolean memberMatches = getNullable(membersByConceptId, String.valueOf(conceptId)).stream().anyMatch(r -> Objects.equals(r.effectiveTime(), run.getReleaseDate()));
+			boolean memberMatches = membersByConceptId.getOrDefault(String.valueOf(conceptId), Collections.emptyList()).stream().anyMatch(r -> Objects.equals(r.effectiveTime(), run.getReleaseDate()));
 			if (conceptMatches || memberMatches) {
 				result.add(conceptId);
 			}
@@ -114,12 +118,14 @@ public class LateralizableRefsetValidationService {
 			if (!membersToRemove.isEmpty()) {
 				assertionOfMembersToRemove.setCurrentViolatedReferenceSetMembers(new ArrayList<>(membersToRemove));
 			}
+
+			LOGGER.info("{} Concepts FILTERED for removal from lateralisable reference set.", membersToRemove.size());
 		}
 	}
 
 	private void reportConceptsToAdd(ValidationRun run, Set<Long> conceptsToAdd, Assertion assertionOfConceptsToAdd, SnomedQueryService queryService) throws ServiceException {
 		if (!conceptsToAdd.isEmpty()) {
-			Set<String> allReferencedComponentIds = run.getLateralizableRefsetMembers().stream().map(ReferenceSetMember::referencedComponentId).collect(Collectors.toSet());
+			Set<String> allReferencedComponentIds = run.getLateralizableRefsetMembers().stream().filter(ReferenceSetMember::active).map(ReferenceSetMember::referencedComponentId).collect(Collectors.toSet());
 			Set<Long> referencedComponentIdsToAdd = conceptsToAdd.stream().filter(conceptId -> !allReferencedComponentIds.contains(conceptId.toString())).collect(Collectors.toSet());
 			if (!referencedComponentIdsToAdd.isEmpty()) {
 				Set<Long> filteredReferencedComponentIdsToAdd;
@@ -137,6 +143,8 @@ public class LateralizableRefsetValidationService {
 				if (!filteredReferencedComponentIdsToAdd.isEmpty()) {
 					assertionOfConceptsToAdd.setCurrentViolatedConceptIds(new ArrayList<>(referencedComponentIdsToAdd));
 				}
+
+				LOGGER.info("{} Concepts FILTERED for addition to lateralisable reference set.", filteredReferencedComponentIdsToAdd.size());
 			}
 		}
 	}
@@ -161,14 +169,5 @@ public class LateralizableRefsetValidationService {
 		}
 
 		return membersByConceptId;
-	}
-
-	private List<ReferenceSetMember> getNullable(Map<String, List<ReferenceSetMember>> membersByConceptId, String key) {
-		List<ReferenceSetMember> value = membersByConceptId.get(key);
-		if (value == null) {
-			return Collections.emptyList();
-		}
-
-		return value;
 	}
 }
