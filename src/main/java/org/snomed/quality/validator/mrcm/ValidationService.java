@@ -40,6 +40,7 @@ import org.springframework.util.CollectionUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -827,6 +828,7 @@ public class ValidationService {
 		private final ComponentStore componentStore;
 		private final Set<Long> conceptsUsedInMRCMTemplates;
 		private final Map<Long, List<DescriptionImpl>> descriptions;
+		private final Map<String, AtomicInteger> relationshipRoleGroupIncrementer;
 
 		public OWLExpressionAndDescriptionFactory(ComponentStore componentStore, Set<Long> ungroupedAttributes, Set<Long> conceptsUsedInMRCMTemplates) {
 			super(componentStore);
@@ -834,6 +836,7 @@ public class ValidationService {
 			this.axiomConverter = new AxiomRelationshipConversionService(ungroupedAttributes);
 			this.conceptsUsedInMRCMTemplates = conceptsUsedInMRCMTemplates;
 			this.descriptions = new Long2ObjectArrayMap<>();
+			this.relationshipRoleGroupIncrementer = new HashMap<>();
 		}
 
 		@Override
@@ -844,7 +847,8 @@ public class ValidationService {
 					// Fields: id	effectiveTime	active	moduleId	refsetId	referencedComponentId	owlExpression
 					String owlExpression = otherValues[0];
 					try {
-						AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(owlExpression);
+						AtomicInteger groupOffset = getGroupOffset(referencedComponentId);
+						AxiomRepresentation axiom = axiomConverter.convertAxiomToRelationships(owlExpression, groupOffset);
 						if (axiom != null) {
 							if (axiom.getLeftHandSideNamedConcept() != null && axiom.getRightHandSideRelationships() != null) {
 								// Regular axiom
@@ -895,6 +899,11 @@ public class ValidationService {
 					this.addStatedConceptChild(namedConcept.toString(), destinationId);
 				}
 			}));
+		}
+
+		private AtomicInteger getGroupOffset(String conceptId) {
+			this.relationshipRoleGroupIncrementer.computeIfAbsent(conceptId, k -> new AtomicInteger(0));
+			return this.relationshipRoleGroupIncrementer.get(conceptId);
 		}
 
 		private ComponentStore getComponentStore() {
