@@ -902,7 +902,7 @@ public class ValidationService {
 		}
 
 		private AtomicInteger getGroupOffset(String conceptId) {
-			this.relationshipRoleGroupIncrementer.computeIfAbsent(conceptId, k -> new AtomicInteger(0));
+			this.relationshipRoleGroupIncrementer.computeIfAbsent(conceptId, k -> new AtomicInteger(1)); // Skipping to 1 as 0 reserved for non-grouped
 			return this.relationshipRoleGroupIncrementer.get(conceptId);
 		}
 
