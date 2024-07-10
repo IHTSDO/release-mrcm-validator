@@ -195,12 +195,8 @@ public class Assertion {
 					attribute.getAttributeId() + (attribute.getAttributeFsn() == null ? "" : " |" + attribute.getAttributeFsn() + "|"),
 					validationType.getName().toLowerCase());
 			detail +=  domainConstraint != null ? domainConstraint : " ";
-		} else if (ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType) {
-			if (!CollectionUtils.isEmpty(this.currentViolatedReferenceSetMembers)) {
-				detail = "Refset member Id= %s should be inactivated/removed from Lateralizable reference set";
-			} else {
-				detail = "Concept Id= %s should be added to Lateralizable reference set";
-			}
+		} else if (ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType && !CollectionUtils.isEmpty(this.currentViolatedConcepts)) {
+			detail = "Concept Id= %s should be %s Lateralizable reference set";
 		}
 		return detail;
 	}
