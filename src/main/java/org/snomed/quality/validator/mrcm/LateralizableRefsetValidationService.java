@@ -71,11 +71,8 @@ public class LateralizableRefsetValidationService {
 
 			try {
 				ConceptResult conceptResult = queryService.retrieveConcept(member.referencedComponentId());
-				if (conceptResult != null) {
-					String fsn = conceptResult.getFsn();
-					if (fsn != null && (fsn.endsWith("(cell)") || fsn.endsWith("(cell structure)") || fsn.endsWith("(morphologic abnormality)"))) {
-						result.add(conceptResult);
-					}
+				if (conceptResult != null && isCellStructure(conceptResult.getFsn())) {
+					result.add(conceptResult);
 				}
 			} catch (ConceptNotFoundException e) {
 				result.add(new ConceptResult(member.referencedComponentId()));
@@ -93,6 +90,10 @@ public class LateralizableRefsetValidationService {
 
 		for (Long conceptId : conceptsToAdd) {
 			ConceptResult conceptResult = queryService.retrieveConcept(conceptId.toString());
+			if (isCellStructure(conceptResult.getFsn())) {
+				continue;
+			}
+
 			boolean conceptMatches = conceptResult.getEffectiveTime().equals(run.getReleaseDate());
 			boolean memberMatches = membersByConceptId.getOrDefault(String.valueOf(conceptId), Collections.emptyList()).stream().anyMatch(r -> Objects.equals(r.effectiveTime(), run.getReleaseDate()));
 			if (conceptMatches || memberMatches) {
@@ -164,5 +165,13 @@ public class LateralizableRefsetValidationService {
 		}
 
 		return membersByConceptId;
+	}
+
+	private boolean isCellStructure(String fsn) {
+		if (fsn == null) {
+			return false;
+		}
+
+		return fsn.endsWith("(cell)") || fsn.endsWith("(cell structure)") || fsn.endsWith("(morphologic abnormality)");
 	}
 }
