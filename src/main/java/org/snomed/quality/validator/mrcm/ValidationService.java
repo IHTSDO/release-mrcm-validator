@@ -734,7 +734,7 @@ public class ValidationService {
 							anatomyStructureAndEntireRefsets.add(new ReferenceSetMember(id, effectiveTime, "1".equals(active), moduleId, refsetId, referencedComponentId, otherValues));
 							break;
 						default:
-							LOGGER.error("Invalid refsetId {}", refsetId);
+							LOGGER.trace("Refset member from refsetId {} not required for MRCM processing", refsetId);
 							break;
 					}
 				}
