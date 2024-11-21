@@ -12,6 +12,8 @@ public final class ValidationRun {
 	private List<ValidationType> validationTypes;
 	private Map<String, Domain> mrcmDomains;
 	private Set<ReferenceSetMember> lateralizableRefsetMembers;
+	private List<ReferenceSetMember> anatomyStructureAndPartRefsets;
+	private List<ReferenceSetMember> anatomyStructureAndEntireRefsets;
 	private Map<String, List<Attribute>> attributeRangesMap;
 	private final List<Assertion> assertionsCompleted;
 	private final List<Assertion> assertionSkipped;
@@ -147,6 +149,22 @@ public final class ValidationRun {
 
 	public Set<ReferenceSetMember> getLateralizableRefsetMembers() {
 		return lateralizableRefsetMembers;
+	}
+
+	public void setAnatomyStructureAndEntireRefsets(List<ReferenceSetMember> anatomyStructureAndEntireRefsets) {
+		this.anatomyStructureAndEntireRefsets = anatomyStructureAndEntireRefsets;
+	}
+
+	public List<ReferenceSetMember> getAnatomyStructureAndEntireRefsets() {
+		return anatomyStructureAndEntireRefsets;
+	}
+
+	public void setAnatomyStructureAndPartRefsets(List<ReferenceSetMember> anatomyStructureAndPartRefsets) {
+		this.anatomyStructureAndPartRefsets = anatomyStructureAndPartRefsets;
+	}
+
+	public List<ReferenceSetMember> getAnatomyStructureAndPartRefsets() {
+		return anatomyStructureAndPartRefsets;
 	}
 
 	@Override

@@ -69,6 +69,10 @@ public final class Constants {
 
 	public static final String LATERALIZABLE_BODY_STRUCTURE_REFSET = "723264001";
 
+	public static final String ANATOMY_STRUCTURE_AND_ENTIRE_REFSET = "734138000";
+
+	public static final String ANATOMY_STRUCTURE_AND_PART_REFSET = "734139008";
+
 	public static final String OWL_AXIOM_REFSET = "733073007";
 
 	public static final String ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT = "723593002";
