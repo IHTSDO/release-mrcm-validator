@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class SEPRefsetValidationService {
-    private static final String BODY_STRUCTURE_SEMANTIC_TAG = "(body structure)";
+    private static final String BODY_STRUCTURE_SEMANTIC_TAG = "body structure";
     private static final String ENTIRE = "Entire";
     private static final String ALL = "All";
     private static final String PART = "Part";
@@ -168,7 +168,7 @@ public class SEPRefsetValidationService {
             if (item.active() && !exclusionList.contains(item.referencedComponentId())) {
                 ConceptResult referencedConceptResult = getConceptResultOrNull(queryService, item.referencedComponentId());
                 if (referencedConceptResult != null && referencedConceptResult.isActive()) {
-                    String fsnWithoutSemanticTag = referencedConceptResult.getFsn().replaceAll(BODY_STRUCTURE_SEMANTIC_TAG + "$", "");
+                    String fsnWithoutSemanticTag = referencedConceptResult.getFsn().replaceAll("[/(]" + BODY_STRUCTURE_SEMANTIC_TAG + "[/)]$", "");
                     if (!StringUtils.containsAnyIgnoreCase(fsnWithoutSemanticTag, STRUCTURE) || fsnWithoutSemanticTag.startsWith(ALL) || fsnWithoutSemanticTag.startsWith(ENTIRE) || fsnWithoutSemanticTag.startsWith(PART)) {
                         assertion.getCurrentViolatedConceptIds().add(Long.parseLong(item.referencedComponentId()));
                         assertion.getCurrentViolatedConcepts().add(referencedConceptResult);
@@ -317,7 +317,7 @@ public class SEPRefsetValidationService {
         while (offset < totalConcept) {
             ConceptResults conceptResults = queryService.listAll(offset, limit);
             conceptResults.items().forEach(item -> {
-                if (item.getFsn().endsWith(BODY_STRUCTURE_SEMANTIC_TAG)) {
+                if (item.getFsn().endsWith("(" + BODY_STRUCTURE_SEMANTIC_TAG + ")")) {
                     results.add(item);
                 }
             });
