@@ -4,13 +4,13 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.snomed.quality</groupId>
     <artifactId>mrcm-validator</artifactId>
-    <version>3.6.0</version>
+    <version>3.7.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <parent>
         <groupId>org.snomed</groupId>
         <artifactId>snomed-parent-bom</artifactId>
-        <version>3.7.0</version>
+        <version>3.9.0-SNAPSHOT</version>
     </parent>
 
     <dependencies>
@@ -68,19 +68,6 @@
             <url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
         </repository>
     </repositories>
-
-    <distributionManagement>
-        <repository>
-            <id>ihtsdo-public-nexus-releases</id>
-            <name>IHTSDO Public Nexus Releases</name>
-            <url>https://nexus3.ihtsdotools.org/repository/maven-releases/</url>
-        </repository>
-        <snapshotRepository>
-            <id>ihtsdo-public-nexus-snapshots</id>
-            <name>IHTSDO Public Nexus Snapshots</name>
-            <url>https://nexus3.ihtsdotools.org/repository/maven-snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
 
     <build>
         <plugins>

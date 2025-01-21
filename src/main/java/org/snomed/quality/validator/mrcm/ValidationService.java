@@ -55,9 +55,10 @@ public class ValidationService {
 	private static final Pattern CONCEPT_TERM_PATTERN = Pattern.compile("\\d+\\s\\|(.*?)\\|");
 
 	private static final LoadingProfile MRCM_AND_SIMPLE_REFSET_LOADING_PROFILE = new LoadingProfile()
-			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET, LATERALIZABLE_BODY_STRUCTURE_REFSET)
+			.withRefsets(MRCM_DOMAIN_REFSET, MRCM_ATTRIBUTE_DOMAIN_REFSET, MRCM_ATTRIBUTE_RANGE_REFSET, LATERALIZABLE_BODY_STRUCTURE_REFSET, ANATOMY_STRUCTURE_AND_ENTIRE_REFSET, ANATOMY_STRUCTURE_AND_PART_REFSET)
 			.withIncludedReferenceSetFilenamePattern(".*MRCM.*")
 			.withIncludedReferenceSetFilenamePattern(".*_Refset_Simple.*")
+			.withIncludedReferenceSetFilenamePattern(".*_cRefset_Association.*")
 			.withInactiveRefsetMembers()
 			.withJustRefsets();
 
@@ -124,6 +125,11 @@ public class ValidationService {
                         executeLateralizableRefsetValidation(run, queryService);
                     }
                 }
+				case SEP_REFSET_TYPE -> {
+					if (ContentType.INFERRED.equals(run.getContentType()) && CollectionUtils.isEmpty(run.getModuleIds())) {
+						executeSEPRefsetValidation(run, queryService);
+					}
+				}
                 default -> LOGGER.error("Validation Type: '{}' is not implemented yet!", type);
             }
 		}
@@ -152,12 +158,19 @@ public class ValidationService {
 		run.setUngroupedAttributes(mrcmFactory.getUngroupedAttributes());
 		run.setConceptsUsedInMRCMTemplates(mrcmFactory.getInUseConceptIds());
 		run.setLateralizableRefsetMembers(mrcmFactory.getLateralizableRefsets());
+		run.setAnatomyStructureAndEntireRefsets(mrcmFactory.getAnatomyStructureAndEntireRefsets());
+		run.setAnatomyStructureAndPartRefsets(mrcmFactory.getAnatomyStructureAndPartRefsets());
 	}
 
-	private void executeLateralizableRefsetValidation(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
+	private void executeLateralizableRefsetValidation(ValidationRun run, SnomedQueryService queryService) {
 		// Concrete attribute data type validation
 		LateralizableRefsetValidationService lateralizableRefsetValidationService = new LateralizableRefsetValidationService();
 		lateralizableRefsetValidationService.validate(queryService, run);
+	}
+
+	private void executeSEPRefsetValidation(ValidationRun run, SnomedQueryService queryService) throws ServiceException, IOException {
+		SEPRefsetValidationService sepRefsetValidationService = new SEPRefsetValidationService();
+		sepRefsetValidationService.validate(queryService, run);
 	}
 
 	private void executeConcreteDataTypeValidation(Set<String> extractedRF2FilesDirectories, ValidationRun run, SnomedQueryService queryService) throws ReleaseImportException, ServiceException {
@@ -687,11 +700,13 @@ public class ValidationService {
 		private Set<Long> ungroupedAttributes = new HashSet<>();
 		private Set<Long> inUseConceptIds = new HashSet<>();
 		private Set<ReferenceSetMember> lateralizableRefsets = new HashSet<>();
+		private List<ReferenceSetMember> anatomyStructureAndPartRefsets = new ArrayList<>();
+		private List<ReferenceSetMember> anatomyStructureAndEntireRefsets = new ArrayList<>();
 
 		@Override
 		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
-				if ("1".equals(active) || LATERALIZABLE_BODY_STRUCTURE_REFSET.equals(refsetId)) {
+				if ("1".equals(active) || LATERALIZABLE_BODY_STRUCTURE_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_PART_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_ENTIRE_REFSET.equals(refsetId)) {
 					switch (refsetId) {
 						case MRCM_DOMAIN_REFSET:
 							// use proximal primitive domain constraint instead. see MRCM doc
@@ -712,8 +727,14 @@ public class ValidationService {
 						case LATERALIZABLE_BODY_STRUCTURE_REFSET:
 							lateralizableRefsets.add(new ReferenceSetMember(id, effectiveTime, "1".equals(active), moduleId, refsetId, referencedComponentId));
 							break;
+						case ANATOMY_STRUCTURE_AND_PART_REFSET:
+							anatomyStructureAndPartRefsets.add(new ReferenceSetMember(id, effectiveTime, "1".equals(active), moduleId, refsetId, referencedComponentId, otherValues));
+							break;
+						case ANATOMY_STRUCTURE_AND_ENTIRE_REFSET:
+							anatomyStructureAndEntireRefsets.add(new ReferenceSetMember(id, effectiveTime, "1".equals(active), moduleId, refsetId, referencedComponentId, otherValues));
+							break;
 						default:
-							LOGGER.error("Invalid refsetId {}", refsetId);
+							LOGGER.trace("Refset member from refsetId {} not required for MRCM processing", refsetId);
 							break;
 					}
 				}
@@ -749,6 +770,14 @@ public class ValidationService {
 
 		public Set <ReferenceSetMember> getLateralizableRefsets() {
 			return lateralizableRefsets;
+		}
+
+		public List<ReferenceSetMember> getAnatomyStructureAndEntireRefsets() {
+			return anatomyStructureAndEntireRefsets;
+		}
+
+		public List<ReferenceSetMember> getAnatomyStructureAndPartRefsets() {
+			return anatomyStructureAndPartRefsets;
 		}
 
 		private Domain getCreateDomain(String referencedComponentId) {

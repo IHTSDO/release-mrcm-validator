@@ -141,7 +141,8 @@ public class Assertion {
 		if (ValidationSubType.ATTRIBUTE_RANGE_INACTIVE_CONCEPT == validationSubType
 				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
 				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType
-				|| ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType) {
+				|| ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType
+                || ValidationType.SEP_REFSET_TYPE == validationType) {
 			return getMessage();
 		}
 		String assertionText = String.format("%s must conform to the MRCM %s",
@@ -197,7 +198,12 @@ public class Assertion {
 			detail +=  domainConstraint != null ? domainConstraint : " ";
 		} else if (ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType && !CollectionUtils.isEmpty(this.currentViolatedConcepts)) {
 			detail = "Concept Id= %s should be %s Lateralizable reference set";
-		}
+        } else if (ValidationType.SEP_REFSET_TYPE == validationType) {
+            SEPRefsetValidationService.SEPAssertionType sepAssertionType = SEPRefsetValidationService.SEPAssertionType.fromUUID(getUuid().toString());
+            if (sepAssertionType != null) {
+                detail = sepAssertionType.getDetail();
+            }
+        }
 		return detail;
 	}
 
