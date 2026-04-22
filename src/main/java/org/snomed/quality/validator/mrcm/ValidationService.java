@@ -704,7 +704,7 @@ public class ValidationService {
 		private List<ReferenceSetMember> anatomyStructureAndEntireRefsets = new ArrayList<>();
 
 		@Override
-		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
+		public void newReferenceSetMemberState(String filename, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
 				if ("1".equals(active) || LATERALIZABLE_BODY_STRUCTURE_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_PART_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_ENTIRE_REFSET.equals(refsetId)) {
 					switch (refsetId) {
@@ -870,7 +870,7 @@ public class ValidationService {
 		}
 
 		@Override
-		public void newReferenceSetMemberState(String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
+		public void newReferenceSetMemberState(String filename, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
 				if("1".equals(active) && OWL_AXIOM_REFSET.equals(refsetId)) {
 					// OWL OntologyAxiom reference set

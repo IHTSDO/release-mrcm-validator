@@ -140,7 +140,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		}
 
 		@Override
-		public void newReferenceSetMemberState(final String[] fieldNames, final String id, final String effectiveTime, final String active, final String moduleId,
+		public void newReferenceSetMemberState(String filename, final String[] fieldNames, final String id, final String effectiveTime, final String active, final String moduleId,
 				final String refsetId, final String referencedComponentId, final String... otherValues) {
 			if (OWL_AXIOM_REFSET.equals(refsetId)) {
 				try {
