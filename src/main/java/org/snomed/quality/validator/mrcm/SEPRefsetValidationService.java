@@ -18,31 +18,36 @@ public class SEPRefsetValidationService {
     private static final String ALL = "All";
     private static final String PART = "Part";
     private static final String STRUCTURE = "structure";
+    private static final List<Assertion> ASSERTIONS = Collections.unmodifiableList(Arrays.stream(SEPAssertionType.values())
+            .map(SEPAssertionType::toAssertion)
+            .toList());
 
     public enum SEPAssertionType {
-        ACTIVE_REFERENCED_COMPONENT_SE_REFSET("fd4fdffa-87dc-4241-ae73-7b8c61284056", "The referenced components in SE refset must be active", "The referenced component id=%s in SE refset must be active."),
-        ACTIVE_TARGET_COMPONENT_SE_REFSET("48ad7e95-0e56-4c97-a06f-e8f94773a708", "The target components in SE refset must be active", "The target component id=%s in SE refset must be active."),
-        ACTIVE_REFERENCED_COMPONENT_SP_REFSET("640d186b-4420-49e6-a2ae-0aeaffed85f9", "The referenced components in SP refset  must be active", "The referenced component id=%s in SP refset must be active."),
-        ACTIVE_TARGET_COMPONENT_SP_REFSET("0a19cbb6-8020-4410-9b07-4dcc820c7919", "The target components in SP refset  must be active", "The target component id=%s in SP refset must be active."),
-        DUPLICATE_REFERENCED_COMPONENT_SE_REFSET("4cafa321-0ab0-4b68-8159-39a50c6c26e5", "The referenced components should only appear once in SE refset", "The referenced component id=%s should only appear once per SE refset."),
-        DUPLICATE_REFERENCED_COMPONENT_SP_REFSET("ee13b298-b35b-454f-a91c-d38bec618267", "The referenced components should only appear once in SP refset", "The referenced component id=%s should only appear once per SP refset."),
-        DUPLICATE_TARGET_COMPONENT_SE_REFSET("44e0ba37-6d6e-4843-9cf1-45cf11b0c8e6", "The target components should only appear once in SE refset", "The target component id=%s should only appear once per SE refset."),
-        DUPLICATE_TARGET_COMPONENT_SP_REFSET("a7a42fc4-31d8-4b68-9507-364a25d636f8", "The target components should only appear once in SP refset", "The target component id=%s should only appear once per SP refset."),
-        INVALID_STRUCTURE_CONCEPT_SEP_REFSET("b8a616e8-9752-43ce-bb7f-f68d2537dc1b", "The FSN for an S concept must contain the word Structure (case insensitive match) and must not start with the word Entire, All or Part", "A S concept id=%s in SEP refset must contain the word Structure and must not start with the word Entire, All or Part."),
-        INVALID_PART_CONCEPT_SP_REFSET("eaea2afa-732c-42d2-a228-f8541b883986", "The FSN for a P concept must start with the word Part (case sensitive match) or contain the word part", "A P concept id=%s in SP refset must contain the word part."),
-        INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET("e2267903-5c91-4596-9bdb-662b85f4206b", "The FSN for an E concept must start with the word Entire or the word All (case sensitive match)", "An E concept id=%s in SE refset must start with the word Entire or the word All."),
-        MISSING_ALL_OR_ENTIRE_CONCEPTS_FROM_SE_REFSET("4d1fcca3-cb9b-4cc3-92a5-6e99a5b0110e", "All body structure concepts that start with the word 'Entire' or 'All' should appear in the SE refset", "A body structure concept id=%s that starts with the word Entire or All should appear in the SE refset."),
-        MISSING_PART_CONCEPTS_FROM_SE_REFSET("6245dda6-fc40-4a0e-bbad-f05fcd9aff36", "All body structure concepts that start with the word 'Part' should appear in the SP refset", "A body structure concept id=%s that starts with the word Part should appear in the SP refset."),
-        INVALID_PAIR_OF_TARGET_AND_REFERENCED_COMPONENTS_SEP_REFSET("d8dbdc04-3072-438e-9584-58191520d37d", "For both SE and SP refsets, the 'S' concept should be an inferred parent the targetComponentId (E or P)", "The target component id=%s should have an inferred parent in S concept in SEP refset.");
+        ACTIVE_REFERENCED_COMPONENT_SE_REFSET("fd4fdffa-87dc-4241-ae73-7b8c61284056", "The referenced components in SE refset must be active", "The referenced component id=%s in SE refset must be active.", Assertion.FailureType.ERROR),
+        ACTIVE_TARGET_COMPONENT_SE_REFSET("48ad7e95-0e56-4c97-a06f-e8f94773a708", "The target components in SE refset must be active", "The target component id=%s in SE refset must be active.", Assertion.FailureType.ERROR),
+        ACTIVE_REFERENCED_COMPONENT_SP_REFSET("640d186b-4420-49e6-a2ae-0aeaffed85f9", "The referenced components in SP refset  must be active", "The referenced component id=%s in SP refset must be active.", Assertion.FailureType.ERROR),
+        ACTIVE_TARGET_COMPONENT_SP_REFSET("0a19cbb6-8020-4410-9b07-4dcc820c7919", "The target components in SP refset  must be active", "The target component id=%s in SP refset must be active.", Assertion.FailureType.ERROR),
+        DUPLICATE_REFERENCED_COMPONENT_SE_REFSET("4cafa321-0ab0-4b68-8159-39a50c6c26e5", "The referenced components should only appear once in SE refset", "The referenced component id=%s should only appear once per SE refset.", Assertion.FailureType.WARNING),
+        DUPLICATE_REFERENCED_COMPONENT_SP_REFSET("ee13b298-b35b-454f-a91c-d38bec618267", "The referenced components should only appear once in SP refset", "The referenced component id=%s should only appear once per SP refset.", Assertion.FailureType.WARNING),
+        DUPLICATE_TARGET_COMPONENT_SE_REFSET("44e0ba37-6d6e-4843-9cf1-45cf11b0c8e6", "The target components should only appear once in SE refset", "The target component id=%s should only appear once per SE refset.", Assertion.FailureType.WARNING),
+        DUPLICATE_TARGET_COMPONENT_SP_REFSET("a7a42fc4-31d8-4b68-9507-364a25d636f8", "The target components should only appear once in SP refset", "The target component id=%s should only appear once per SP refset.", Assertion.FailureType.WARNING),
+        INVALID_STRUCTURE_CONCEPT_SEP_REFSET("b8a616e8-9752-43ce-bb7f-f68d2537dc1b", "The FSN for an S concept must contain the word Structure (case insensitive match) and must not start with the word Entire, All or Part", "A S concept id=%s in SEP refset must contain the word Structure and must not start with the word Entire, All or Part.", Assertion.FailureType.ERROR),
+        INVALID_PART_CONCEPT_SP_REFSET("eaea2afa-732c-42d2-a228-f8541b883986", "The FSN for a P concept must start with the word Part (case sensitive match) or contain the word part", "A P concept id=%s in SP refset must contain the word part.", Assertion.FailureType.ERROR),
+        INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET("e2267903-5c91-4596-9bdb-662b85f4206b", "The FSN for an E concept must start with the word Entire or the word All (case sensitive match)", "An E concept id=%s in SE refset must start with the word Entire or the word All.", Assertion.FailureType.ERROR),
+        MISSING_ALL_OR_ENTIRE_CONCEPTS_FROM_SE_REFSET("4d1fcca3-cb9b-4cc3-92a5-6e99a5b0110e", "All body structure concepts that start with the word 'Entire' or 'All' should appear in the SE refset", "A body structure concept id=%s that starts with the word Entire or All should appear in the SE refset.", Assertion.FailureType.WARNING),
+        MISSING_PART_CONCEPTS_FROM_SE_REFSET("6245dda6-fc40-4a0e-bbad-f05fcd9aff36", "All body structure concepts that start with the word 'Part' should appear in the SP refset", "A body structure concept id=%s that starts with the word Part should appear in the SP refset.", Assertion.FailureType.WARNING),
+        INVALID_PAIR_OF_TARGET_AND_REFERENCED_COMPONENTS_SEP_REFSET("d8dbdc04-3072-438e-9584-58191520d37d", "For both SE and SP refsets, the 'S' concept should be an inferred parent the targetComponentId (E or P)", "The target component id=%s should have an inferred parent in S concept in SEP refset.", Assertion.FailureType.WARNING);
 
         final String uuid;
         final String assertionText;
         final String detail;
+        final Assertion.FailureType failureType;
 
-        SEPAssertionType(String uuid, String assertionText, String detail) {
+        SEPAssertionType(String uuid, String assertionText, String detail, Assertion.FailureType failureType) {
             this.uuid = uuid;
             this.assertionText = assertionText;
             this.detail = detail;
+            this.failureType = failureType;
         }
 
         public String getUuid() {
@@ -57,9 +62,21 @@ public class SEPRefsetValidationService {
             return detail;
         }
 
+        public Assertion.FailureType getFailureType() {
+            return failureType;
+        }
+
+        public Assertion toAssertion() {
+            return new Assertion(UUID.fromString(uuid), ValidationType.SEP_REFSET_TYPE, assertionText, failureType);
+        }
+
         static SEPAssertionType fromUUID(String uuid) {
             return Arrays.stream(SEPAssertionType.values()).filter(item -> item.uuid.equals(uuid)).findFirst().orElse(null);
         }
+    }
+
+    public List<Assertion> getAssertions() {
+        return ASSERTIONS;
     }
 
     public void validate(SnomedQueryService queryService, ValidationRun run) throws ServiceException, IOException {
@@ -78,15 +95,15 @@ public class SEPRefsetValidationService {
 
     // 1. For active members, all referenced components and target components are active
     private void validateActiveReferenceAndTargetComponents(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
-        Assertion assertionForReferenceComponentInSERefset = new Assertion(UUID.fromString(SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SE_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertionForReferenceComponentInSERefset = SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForReferenceComponentInSERefset);
-        Assertion assertionForTargetComponentInSERefset = new Assertion(UUID.fromString(SEPAssertionType.ACTIVE_TARGET_COMPONENT_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.ACTIVE_TARGET_COMPONENT_SE_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertionForTargetComponentInSERefset = SEPAssertionType.ACTIVE_TARGET_COMPONENT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForTargetComponentInSERefset);
         doValidateActiveReferenceAndTargetComponents(run.getAnatomyStructureAndEntireRefsets(), queryService, assertionForReferenceComponentInSERefset, assertionForTargetComponentInSERefset);
 
-        Assertion assertionForReferenceComponentInSPRefset = new Assertion(UUID.fromString(SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SP_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertionForReferenceComponentInSPRefset = SEPAssertionType.ACTIVE_REFERENCED_COMPONENT_SP_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForReferenceComponentInSPRefset);
-        Assertion assertionForTargetComponentInSPRefset = new Assertion(UUID.fromString(SEPAssertionType.ACTIVE_TARGET_COMPONENT_SP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.ACTIVE_TARGET_COMPONENT_SP_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertionForTargetComponentInSPRefset = SEPAssertionType.ACTIVE_TARGET_COMPONENT_SP_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForTargetComponentInSPRefset);
         doValidateActiveReferenceAndTargetComponents(run.getAnatomyStructureAndPartRefsets(), queryService, assertionForReferenceComponentInSPRefset, assertionForTargetComponentInSPRefset);
     }
@@ -109,11 +126,11 @@ public class SEPRefsetValidationService {
 
     // 2. For all members (active or inactive) any referencedComponentId (S) should only appear once per refset
     private void validateDuplicateReferenceComponents(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
-        Assertion assertionForReferenceComponentInSERefset = new Assertion(UUID.fromString(SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SE_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForReferenceComponentInSERefset = SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForReferenceComponentInSERefset);
         doValidateDuplicateReferenceComponents(queryService, run.getAnatomyStructureAndEntireRefsets(), assertionForReferenceComponentInSERefset);
 
-        Assertion assertionForReferenceComponentInSPRefset = new Assertion(UUID.fromString(SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SP_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForReferenceComponentInSPRefset = SEPAssertionType.DUPLICATE_REFERENCED_COMPONENT_SP_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForReferenceComponentInSPRefset);
         doValidateDuplicateReferenceComponents(queryService, run.getAnatomyStructureAndPartRefsets(), assertionForReferenceComponentInSPRefset);
     }
@@ -133,11 +150,11 @@ public class SEPRefsetValidationService {
 
     // 3. For all active members, the targetComponentId (E,P) should only appear once
     private void validateDuplicateTargetComponents(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
-        Assertion assertionForTargetComponentInSERefset = new Assertion(UUID.fromString(SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SE_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForTargetComponentInSERefset = SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForTargetComponentInSERefset);
         doValidateDuplicateTargetComponents(queryService, run.getAnatomyStructureAndEntireRefsets(), assertionForTargetComponentInSERefset);
 
-        Assertion assertionForTargetComponentInSPRefset = new Assertion(UUID.fromString(SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SP_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForTargetComponentInSPRefset = SEPAssertionType.DUPLICATE_TARGET_COMPONENT_SP_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForTargetComponentInSPRefset);
         doValidateDuplicateTargetComponents(queryService, run.getAnatomyStructureAndPartRefsets(), assertionForTargetComponentInSPRefset);
     }
@@ -157,7 +174,7 @@ public class SEPRefsetValidationService {
 
     // 4. The FSN for an S concept must contain the word Structure (case insensitive match) and must not start with the word Entire, All or Part
     private void validateAnatomyStructureConceptInSEPRefset(ValidationRun run, SnomedQueryService queryService, Set<String> exclusionList) throws ServiceException {
-        Assertion assertion = new Assertion(UUID.fromString(SEPAssertionType.INVALID_STRUCTURE_CONCEPT_SEP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.INVALID_STRUCTURE_CONCEPT_SEP_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertion = SEPAssertionType.INVALID_STRUCTURE_CONCEPT_SEP_REFSET.toAssertion();
         run.addCompletedAssertion(assertion);
         doValidateAnatomyStructureConceptInSEPRefset(run.getAnatomyStructureAndEntireRefsets(), exclusionList, queryService, assertion);
         doValidateAnatomyStructureConceptInSEPRefset(run.getAnatomyStructureAndPartRefsets(), exclusionList, queryService, assertion);
@@ -180,7 +197,7 @@ public class SEPRefsetValidationService {
 
     // 5. The FSN for a P concept must start with the word Part (case sensitive match) or contain the word part
     private void validatePartConceptInSPRefset(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
-        Assertion assertion = new Assertion(UUID.fromString(SEPAssertionType.INVALID_PART_CONCEPT_SP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.INVALID_PART_CONCEPT_SP_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertion = SEPAssertionType.INVALID_PART_CONCEPT_SP_REFSET.toAssertion();
         run.addCompletedAssertion(assertion);
         for (ReferenceSetMember item : run.getAnatomyStructureAndPartRefsets()) {
             if (item.active()) {
@@ -198,7 +215,7 @@ public class SEPRefsetValidationService {
 
     // 6. The FSN for an E concept must start with the word Entire or the word All (case sensitive match)
     private void validateAllOrEntireConceptInSERefset(ValidationRun run, SnomedQueryService queryService, Set<String> exclusionList) throws ServiceException {
-        Assertion assertion = new Assertion(UUID.fromString(SEPAssertionType.INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET.getAssertionText(), Assertion.FailureType.ERROR);
+        Assertion assertion = SEPAssertionType.INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertion);
         for (ReferenceSetMember item : run.getAnatomyStructureAndEntireRefsets()) {
             if (item.active() && !exclusionList.contains(item.otherValues()[0])) {
@@ -218,10 +235,10 @@ public class SEPRefsetValidationService {
     // Exception: If a S concept has both E concept and All concept, the E concept should be included for the SE refset. But All concept would not be required for the SE refset
     // 8. All body structure concepts that start with the word 'Part' should appear in the SP refset
     private void validateBodyStructureConcepts(ValidationRun run, SnomedQueryService queryService, List<ConceptResult> bodyStructureConcepts) throws ServiceException {
-        Assertion assertionForSERefset = new Assertion(UUID.fromString(SEPAssertionType.MISSING_ALL_OR_ENTIRE_CONCEPTS_FROM_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.MISSING_ALL_OR_ENTIRE_CONCEPTS_FROM_SE_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForSERefset = SEPAssertionType.MISSING_ALL_OR_ENTIRE_CONCEPTS_FROM_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForSERefset);
 
-        Assertion assertionForSPRefset = new Assertion(UUID.fromString(SEPAssertionType.MISSING_PART_CONCEPTS_FROM_SE_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.MISSING_PART_CONCEPTS_FROM_SE_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertionForSPRefset = SEPAssertionType.MISSING_PART_CONCEPTS_FROM_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertionForSPRefset);
 
         Set<String> existingEntires = run.getAnatomyStructureAndEntireRefsets().stream().filter(ReferenceSetMember::active).map(item -> item.otherValues()[0]).collect(Collectors.toSet());
@@ -267,7 +284,7 @@ public class SEPRefsetValidationService {
 
     // 9. For both refsets, the 'S' concept should be an inferred parent the targetComponentId (E or P).
     private void validateParentConceptsOfTargetComponents(ValidationRun run, SnomedQueryService queryService) throws ServiceException {
-        Assertion assertion = new Assertion(UUID.fromString(SEPAssertionType.INVALID_PAIR_OF_TARGET_AND_REFERENCED_COMPONENTS_SEP_REFSET.getUuid()), ValidationType.SEP_REFSET_TYPE, SEPAssertionType.INVALID_PAIR_OF_TARGET_AND_REFERENCED_COMPONENTS_SEP_REFSET.getAssertionText(), Assertion.FailureType.WARNING);
+        Assertion assertion = SEPAssertionType.INVALID_PAIR_OF_TARGET_AND_REFERENCED_COMPONENTS_SEP_REFSET.toAssertion();
         run.addCompletedAssertion(assertion);
         doValidateParentConceptsOfTargetComponents(run.getAnatomyStructureAndEntireRefsets(), queryService, assertion);
         doValidateParentConceptsOfTargetComponents(run.getAnatomyStructureAndPartRefsets(), queryService, assertion);
