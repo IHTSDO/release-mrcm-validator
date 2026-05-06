@@ -704,7 +704,7 @@ public class ValidationService {
 		private List<ReferenceSetMember> anatomyStructureAndEntireRefsets = new ArrayList<>();
 
 		@Override
-		public void newReferenceSetMemberState(String filename, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
+		public void newReferenceSetMemberState(String filename, long lineNumber, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
 				if ("1".equals(active) || LATERALIZABLE_BODY_STRUCTURE_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_PART_REFSET.equals(refsetId) || ANATOMY_STRUCTURE_AND_ENTIRE_REFSET.equals(refsetId)) {
 					switch (refsetId) {
@@ -870,7 +870,7 @@ public class ValidationService {
 		}
 
 		@Override
-		public void newReferenceSetMemberState(String filename, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
+		public void newReferenceSetMemberState(String filename, long lineNumber, String[] fieldNames, String id, String effectiveTime, String active, String moduleId, String refsetId, String referencedComponentId, String... otherValues) {
 			synchronized (this) {
 				if("1".equals(active) && OWL_AXIOM_REFSET.equals(refsetId)) {
 					// OWL OntologyAxiom reference set
@@ -896,7 +896,7 @@ public class ValidationService {
 		}
 
 		@Override
-		public void newDescriptionState(String id, String effectiveTime, String active, String moduleId, String conceptId, String languageCode, String typeId, String term, String caseSignificanceId) {
+		public void newDescriptionState(String filename, long lineNumber, String id, String effectiveTime, String active, String moduleId, String conceptId, String languageCode, String typeId, String term, String caseSignificanceId) {
 			if (conceptsUsedInMRCMTemplates.contains(Long.parseLong(conceptId))) {
 				DescriptionImpl description = new DescriptionImpl(id, FactoryUtils.parseActive(active), term, conceptId);
 				if (descriptions.containsKey(Long.valueOf(conceptId))) {
@@ -920,7 +920,7 @@ public class ValidationService {
 
 				// Build a composite identifier for this 'relationship' (which is actually a fragment of an axiom expression) because it doesn't have its own component identifier.
 				String compositeIdentifier = axiomId + "/Group_" + group + "/Type_" + typeId + "/Destination_" + destinationId;
-				newRelationshipState(compositeIdentifier, effectiveTime, "1", moduleId, namedConcept.toString(), destinationId, String.valueOf(group), typeId, ConceptConstants.STATED_RELATIONSHIP,  "900000000000451002");
+				newRelationshipState("", 0L, compositeIdentifier, effectiveTime, "1", moduleId, namedConcept.toString(), destinationId, String.valueOf(group), typeId, ConceptConstants.STATED_RELATIONSHIP,  "900000000000451002");
 				logger.debug("Add axiom relationship {}", compositeIdentifier);
 				
 				this.addStatedConceptAttribute(namedConcept.toString(), typeId, destinationId);
