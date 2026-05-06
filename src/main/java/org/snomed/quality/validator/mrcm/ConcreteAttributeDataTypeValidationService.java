@@ -96,7 +96,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		}
 
 		@Override
-		public void newConcreteRelationshipState(final String id, final String effectiveTime, final String active, final String moduleId, final String sourceId,
+		public void newConcreteRelationshipState(final String filename, final long lineNumber, final String id, final String effectiveTime, final String active, final String moduleId, final String sourceId,
 				final String value, final String relationshipGroup, final String typeId, final String characteristicTypeId, final String modifierId) {
 			if ("1".equals(active)) {
 				if (concreteAttributeDataTypeMap.containsKey(typeId)) {
@@ -140,7 +140,7 @@ public class ConcreteAttributeDataTypeValidationService {
 		}
 
 		@Override
-		public void newReferenceSetMemberState(String filename, final String[] fieldNames, final String id, final String effectiveTime, final String active, final String moduleId,
+		public void newReferenceSetMemberState(final String filename, final long lineNumber, final String[] fieldNames, final String id, final String effectiveTime, final String active, final String moduleId,
 				final String refsetId, final String referencedComponentId, final String... otherValues) {
 			if (OWL_AXIOM_REFSET.equals(refsetId)) {
 				try {
