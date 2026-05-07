@@ -70,10 +70,8 @@ public class ValidationServiceTest {
 				"Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb06 are invalid",
 				"Terms used in the range rule for MRCM attribute range e6bbf042-3c52-4e16-be72-f780d002fb07 are invalid",
 				"The attribute value of 272741003 |Laterality (attribute)| must conform to the MRCM attribute range << 182353008 |Side (qualifier value)|",
-				"The attribute value of 3311481003 must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311482005 |Has presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute range dec(#10..#20)",
 				"The attribute value of 3311482006 |Has integer presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute range int(#30..#40)",
-				"The attribute value of 3311482006 |Has integer presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311482007 |Has string presentation strength denominator value concrete (attribute)| must conform to the MRCM attribute range str(\"test\")",
 				"The attribute value of 3311482007 |Has string presentation strength denominator value concrete (attribute)| must conform to the MRCM concrete attribute data type",
 				"The attribute value of 3311483000 must conform to the MRCM concrete attribute data type",
@@ -84,7 +82,7 @@ public class ValidationServiceTest {
 
 		validationService.validateRelease(testReleaseFiles, run);
 
-		assertEquals(287, run.getCompletedAssertions().size());
+		assertEquals(286, run.getCompletedAssertions().size());
 		assertEquals(0, run.getSkippedAssertions().size());
 		List<String> actualFailedMessages = run.getFailedAssertions().stream().map(Assertion::getAssertionText).sorted().toList();
 		assertEquals(expectedFailedMessages.toString(), actualFailedMessages.toString());
@@ -276,13 +274,11 @@ public class ValidationServiceTest {
 						"The attribute value of 3311482006 must conform to the MRCM concrete attribute data type");
 		final List<String> failedAssertionMessages =
 				Arrays.asList("Relationship concrete value #100.0 found but no concrete data type is defined in the MRCM range constraint.",
-						"Axiom concrete value #1 found but no concrete data type is defined in the MRCM range constraint.",
-						"Axiom concrete value of #200 is not a type of STRING as defined in the MRCM.",
-						"Relationship concrete value #1.0 found but no concrete data type is defined in the MRCM range constraint.",
-						"Axiom concrete value of \"\"500\"\" is not a type of INTEGER as defined in the MRCM.");
+						"Relationship concrete value of #50 is not a type of STRING as defined in the MRCM.",
+						"Relationship concrete value #1.0 found but no concrete data type is defined in the MRCM range constraint.");
 		final List<Long> expectedViolatedConceptIds = Arrays.asList(375745003L, 375745004L, 375745005L);
 		final Set<Assertion> failedAssertions = run.getFailedAssertions();
-		assertEquals(5, failedAssertions.size());
+		assertEquals(3, failedAssertions.size());
 		failedAssertions.forEach(failed -> {
 			System.out.println(failed.getAssertionText());
 			assertTrue(failed.getAssertionText(), assertionMessages.contains(failed.getAssertionText()));

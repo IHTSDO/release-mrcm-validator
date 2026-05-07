@@ -143,7 +143,9 @@ public class ValidationService {
 						.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET)
 						.withoutInferredAttributeMapOnConcept()
 						.withInactiveConcepts()
-				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET, OWL_AXIOM_REFSET).withInactiveConcepts();
+						.withoutRelationships()
+						.withoutIdentifiers()
+				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET).withoutStatedAttributeMapOnConcept().withInactiveConcepts().withoutIdentifiers();
 
 		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(extractedRF2FilesDirectories, profile, owlExpressionAndDescriptionFactory, fullSnapshotRelease);
 		return new SnomedQueryService(releaseStore);
