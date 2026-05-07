@@ -20,8 +20,8 @@ public class ConcreteAttributeDataTypeValidationService {
 
 	public void validate(Set<String> extractedRF2FilesDirectories, ValidationRun run) throws ReleaseImportException {
 		LoadingProfile profile = run.getContentType() == ContentType.STATED ?
-				LoadingProfile.light.withRefsets(OWL_AXIOM_REFSET).withJustRefsets() :
-				LoadingProfile.light.withoutStatedRelationships().withoutDescriptions().withRefsets(OWL_AXIOM_REFSET);
+				LoadingProfile.light.withRefsets(OWL_AXIOM_REFSET).withoutRelationships().withoutDescriptions().withoutIdentifiers() :
+				LoadingProfile.light.withoutAllRefsets().withoutStatedRelationships().withoutDescriptions().withoutIdentifiers();
 
 		Map<String, Attribute> attributeRangeMap = new HashMap<>();
 		Map<String, Type> concreteAttributeDataTypeMap = new HashMap<>();
