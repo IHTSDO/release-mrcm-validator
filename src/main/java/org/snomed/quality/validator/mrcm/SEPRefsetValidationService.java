@@ -2,6 +2,7 @@ package org.snomed.quality.validator.mrcm;
 
 import org.apache.commons.lang3.StringUtils;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
+import org.ihtsdo.otf.sqs.service.dto.ConceptIdResults;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResults;
 import org.ihtsdo.otf.sqs.service.exception.ConceptNotFoundException;
@@ -214,11 +215,15 @@ public class SEPRefsetValidationService {
     }
 
     // 6. The FSN for an E concept must start with the word Entire or the word All (case sensitive match)
+    // This validation should exclude concepts under << 4421005 |Cell structure (cell structure)|, but still keep sub-hierarchy << 312237004 |Chromosome structure (cell structure)|
     private void validateAllOrEntireConceptInSERefset(ValidationRun run, SnomedQueryService queryService, Set<String> exclusionList) throws ServiceException {
         Assertion assertion = SEPAssertionType.INVALID_ALL_OR_ENTIRE_CONCEPT_SE_REFSET.toAssertion();
         run.addCompletedAssertion(assertion);
+        String includedConceptsECL = "<<312237004";
+        ConceptIdResults results = queryService.eclQueryReturnConceptIdentifiers(includedConceptsECL, 0, -1);
+        List<Long> includedConceptIds = results.conceptIds();
         for (ReferenceSetMember item : run.getAnatomyStructureAndEntireRefsets()) {
-            if (item.active() && !exclusionList.contains(item.otherValues()[0])) {
+            if (item.active() && (includedConceptIds.contains(Long.parseLong(item.otherValues()[0])) || !exclusionList.contains(item.otherValues()[0]))) {
                 ConceptResult referencedConceptResult = getConceptResultOrNull(queryService, item.otherValues()[0]);
                 if (referencedConceptResult != null && referencedConceptResult.isActive()) {
                     String fsn = referencedConceptResult.getFsn();
