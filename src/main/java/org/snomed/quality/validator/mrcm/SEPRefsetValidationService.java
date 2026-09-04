@@ -1,6 +1,6 @@
 package org.snomed.quality.validator.mrcm;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.dto.ConceptIdResults;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
@@ -187,7 +187,7 @@ public class SEPRefsetValidationService {
                 ConceptResult referencedConceptResult = getConceptResultOrNull(queryService, item.referencedComponentId());
                 if (referencedConceptResult != null && referencedConceptResult.isActive()) {
                     String fsnWithoutSemanticTag = referencedConceptResult.getFsn().replaceAll("[/(]" + BODY_STRUCTURE_SEMANTIC_TAG + "[/)]$", "");
-                    if (!StringUtils.containsAnyIgnoreCase(fsnWithoutSemanticTag, STRUCTURE) || fsnWithoutSemanticTag.startsWith(ALL) || fsnWithoutSemanticTag.startsWith(ENTIRE) || fsnWithoutSemanticTag.startsWith(PART)) {
+                    if (!Strings.CI.contains(fsnWithoutSemanticTag, STRUCTURE) || fsnWithoutSemanticTag.startsWith(ALL) || fsnWithoutSemanticTag.startsWith(ENTIRE) || fsnWithoutSemanticTag.startsWith(PART)) {
                         assertion.getCurrentViolatedConceptIds().add(Long.parseLong(item.referencedComponentId()));
                         assertion.getCurrentViolatedConcepts().add(referencedConceptResult);
                     }
