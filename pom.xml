@@ -17,7 +17,6 @@
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-runtime</artifactId>
-            <version>4.5.3</version> <!-- See: https://github.com/antlr/antlr4/issues/3895 -->
         </dependency>
         <dependency>
             <groupId>org.ihtsdo.otf</groupId>
