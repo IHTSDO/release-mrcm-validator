@@ -479,14 +479,32 @@ public class ValidationService {
 				msgBuilder.append(domain.getDomainConstraint());
 			}
 		}
+		// A concept may carry Laterality only if it IS, or descends from, a
+		// member. That is one term-set query over the ancestor field, which is
+		// already indexed per concept, asked once for every candidate at once.
+		// It replaces an ECL query PER CANDIDATE - ">" + conceptId - each a
+		// distinct string, so nothing could be cached and every one paid a
+		// fresh ECL parse.
+		//
+		// conceptsWithAnyAncestor returns PROPER descendants, so the members
+		// themselves are unioned back in.
+		//
+		// Deliberately not "<< ^ 723264001", which the comment above
+		// contemplates. snomed-query-service drops the descendant operator
+		// over a member-of expression, so that form returns the members alone
+		// and fails every descendant of one - silently. The fix,
+		// IHTSDO/snomed-query-service#12, is not merged yet. This form does not
+		// depend on it, and asking for the two sets is no more work: resolving
+		// "<< ^" does the same member lookup and the same term-set query
+		// internally.
+		Set<Long> allowed = new HashSet<>(memberOfLateralizbleRefset);
+		allowed.addAll(queryService.conceptsWithAnyAncestor(memberOfLateralizbleRefset));
+
 		List<Long> violatedConcepts = new ArrayList<>();
+		// Iteration order preserved: the report samples failing concepts, so a
+		// reordered list would change that sample from run to run.
 		for (Long conceptId : conceptsWithAttribute) {
-			if (memberOfLateralizbleRefset.contains(conceptId)) {
-				continue;
-			}
-			// it should be parentOf but the query service doesn't support childOf or parentOf yet.
-			List<Long> ancestors = queryService.eclQueryReturnConceptIdentifiers(">" + conceptId, 0, -1).conceptIds();
-			if (ancestors.stream().noneMatch(concept -> memberOfLateralizbleRefset.contains(concept))) {
+			if (!allowed.contains(conceptId)) {
 				violatedConcepts.add(conceptId);
 			}
 		}
