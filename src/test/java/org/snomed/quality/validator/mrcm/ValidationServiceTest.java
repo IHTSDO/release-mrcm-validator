@@ -4,6 +4,8 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
@@ -286,5 +288,75 @@ public class ValidationServiceTest {
 			assertEquals(FailureType.ERROR, failed.getFailureType());
 			assertTrue(expectedViolatedConceptIds.containsAll(failed.getCurrentViolatedConceptIds()));
 		});
+	}
+
+	/**
+	 * A release that names a concept it never defines - an OWL axiom outliving
+	 * its concept, which is what SNOMED CT-AU's 20260930 daily build shipped.
+	 *
+	 * <p>Before this, the phase died inside the Lucene indexer with
+	 * "value must not be null" and no concept id, so nothing in the release was
+	 * validated and nothing said which concept was at fault.
+	 *
+	 * <p>The fixture is the ordinary one plus a single extra axiom row, copied to
+	 * a temporary directory rather than checked in as a second corpus: the
+	 * difference that matters is one line, and a duplicated corpus would hide it
+	 * in nine hundred identical ones.
+	 */
+	@Test
+	public void aConceptReferencedButNotDefinedIsReportedRatherThanFatal() throws Exception {
+		File files = releaseWithAnAxiomForAnUndefinedConcept();
+		ValidationRun statedRun = new ValidationRun(null, ContentType.STATED, false);
+		statedRun.setFullSnapshotRelease(true);
+		statedRun.setValidationTypes(Arrays.asList(ValidationType.values()));
+		ValidationService service = new ValidationService();
+		service.loadMRCM(files, statedRun);
+
+		service.validateRelease(files, statedRun);
+
+		Assertion reported = statedRun.getCompletedAssertions().stream()
+				.filter(a -> ValidationService.ASSERTION_ID_CONCEPTS_REFERENCED_BUT_NOT_DEFINED
+						.equals(a.getUuid().toString()))
+				.findFirst()
+				.orElseThrow(() -> new AssertionError("no finding for the undefined concept"));
+		assertEquals(Collections.singletonList(UNDEFINED_CONCEPT),
+				reported.getCurrentViolatedConceptIds());
+		// The point of the change: one malformed concept costs one finding, not
+		// the validation of everything else in the release.
+		assertTrue("other MRCM validation still ran",
+				statedRun.getCompletedAssertions().size() > 1);
+	}
+
+	/** An id no file in the test corpus defines. */
+	private static final long UNDEFINED_CONCEPT = 999999999000001007L;
+
+	/**
+	 * The test corpus, copied, with one active OWL axiom added for a concept
+	 * that has no concept row anywhere in it.
+	 */
+	private File releaseWithAnAxiomForAnUndefinedConcept() throws IOException {
+		Path copy = Files.createTempDirectory("mrcm-undefined-concept");
+		copy.toFile().deleteOnExit();
+		Path source = testReleaseFiles.toPath();
+		try (java.util.stream.Stream<Path> files = Files.list(source)) {
+			for (Path file : files.toList()) {
+				Path target = copy.resolve(file.getFileName());
+				Files.copy(file, target);
+				target.toFile().deleteOnExit();
+			}
+		}
+		Path axioms;
+		try (java.util.stream.Stream<Path> files = Files.list(copy)) {
+			axioms = files.filter(p -> p.getFileName().toString().contains("OWLExpression"))
+					.findFirst()
+					.orElseThrow(() -> new IllegalStateException(
+							"the test corpus has no OWL expression file to extend"));
+		}
+		Files.writeString(axioms,
+				"c0ffee11-0000-4000-8000-00000000cafe\t20170731\t1\t900000000000207008"
+						+ "\t733073007\t" + UNDEFINED_CONCEPT
+						+ "\tSubClassOf(:" + UNDEFINED_CONCEPT + " :138875005)\n",
+				java.nio.file.StandardOpenOption.APPEND);
+		return copy.toFile();
 	}
 }
