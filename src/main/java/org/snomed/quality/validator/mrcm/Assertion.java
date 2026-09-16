@@ -142,7 +142,9 @@ public class Assertion {
 				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_CONCEPT == validationSubType
 				|| ValidationSubType.ATTRIBUTE_RANGE_INVALID_TERM == validationSubType
 				|| ValidationType.LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE == validationType
-                || ValidationType.SEP_REFSET_TYPE == validationType) {
+                || ValidationType.SEP_REFSET_TYPE == validationType
+                // Carries its own message; no MRCM attribute behind it.
+                || ValidationType.RELEASE_INTEGRITY == validationType) {
 			return getMessage();
 		}
 		String assertionText = String.format("%s must conform to the MRCM %s",
@@ -203,6 +205,8 @@ public class Assertion {
             if (sepAssertionType != null) {
                 detail = sepAssertionType.getDetail();
             }
+        } else if (ValidationType.RELEASE_INTEGRITY == validationType) {
+            detail = "The concept is referenced by the release but has no concept row";
         }
 		return detail;
 	}
