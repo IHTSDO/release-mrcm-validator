@@ -19,6 +19,7 @@ import org.ihtsdo.otf.snomedboot.factory.implementation.standard.DescriptionImpl
 import org.ihtsdo.otf.sqs.service.ReleaseImportManager;
 import org.ihtsdo.otf.sqs.service.SnomedQueryService;
 import org.ihtsdo.otf.sqs.service.dto.ConceptResult;
+import org.ihtsdo.otf.sqs.service.exception.ConceptNotFoundException;
 import org.ihtsdo.otf.sqs.service.exception.ServiceException;
 import org.ihtsdo.otf.sqs.service.store.RamReleaseStore;
 import org.ihtsdo.otf.sqs.service.store.ReleaseStore;
@@ -110,6 +111,7 @@ public class ValidationService {
 		List<Long> preCoordinatedTypes = queryService.eclQueryReturnConceptIdentifiers("<<" + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT, 0, 100).conceptIds();
 		Assert.notEmpty(preCoordinatedTypes, "Concept " + ALL_NEW_PRE_COORDINATED_CONTENT_CONCEPT + " and descendants must be accessible.");
 
+		reportConceptsReferencedButNotDefined(run);
 		for (ValidationType type : run.getValidationTypes()) {
 			if (!isValidationApplicable(type, run)) {
 				continue;
@@ -143,8 +145,25 @@ public class ValidationService {
 			case LATERALIZABLE_BODY_STRUCTURE_REFSET_TYPE, SEP_REFSET_TYPE ->
 					inferredContent && noModuleFilter;
 			case CONCRETE_ATTRIBUTE_DATA_TYPE -> true;
+			// Never run from the loop: the undefined concepts are known only at
+			// load time - they are the ones that could not be indexed - so the
+			// finding is already reported before this runs. Answering false here
+			// rather than adding an empty case above keeps the switch below
+			// listing things that execute.
+			case RELEASE_INTEGRITY -> false;
 		};
 	}
+
+	/** Ids from the last load that the release referenced but never defined. */
+	private final ThreadLocal<List<Long>> lastUndefinedConcepts =
+			ThreadLocal.withInitial(ArrayList::new);
+
+	/**
+	 * A concept the release references but does not define. Fixed, because a
+	 * report has to be able to say "this is the same finding as last night".
+	 */
+	public static final String ASSERTION_ID_CONCEPTS_REFERENCED_BUT_NOT_DEFINED =
+			"6b1b0a3e-8b0a-4a3e-9f0a-2c4d6e8f0a1b";
 
 	protected SnomedQueryService getSnomedQueryService(Set<String> extractedRF2FilesDirectories, ContentType contentType, OWLExpressionAndDescriptionFactory owlExpressionAndDescriptionFactory, boolean fullSnapshotRelease) throws ReleaseImportException, IOException {
 		LoadingProfile profile = contentType == ContentType.STATED ?
@@ -158,8 +177,34 @@ public class ValidationService {
 						.withoutIdentifiers()
 				: LoadingProfile.light.withRefsets(LATERALIZABLE_BODY_STRUCTURE_REFSET).withoutStatedAttributeMapOnConcept().withInactiveConcepts().withoutIdentifiers();
 
-		ReleaseStore releaseStore = new MRCMValidatorReleaseImportManager().loadReleaseFilesToMemoryBasedIndex(extractedRF2FilesDirectories, profile, owlExpressionAndDescriptionFactory, fullSnapshotRelease);
+		MRCMValidatorReleaseImportManager importManager = new MRCMValidatorReleaseImportManager();
+		ReleaseStore releaseStore = importManager.loadReleaseFilesToMemoryBasedIndex(extractedRF2FilesDirectories, profile, owlExpressionAndDescriptionFactory, fullSnapshotRelease);
+		lastUndefinedConcepts.set(importManager.undefinedConcepts());
 		return new SnomedQueryService(releaseStore);
+	}
+
+	/**
+	 * Reports concepts the release references but never defines.
+	 *
+	 * <p>They cannot be indexed - a concept with no concept row has a null
+	 * module and a null definition status, and Lucene rejects a null field value
+	 * - so before this they took the whole MRCM phase down from inside the
+	 * indexer, with a message naming no concept at all. A release malformed in
+	 * one place should still be validated everywhere else, and the one thing the
+	 * report must do is say WHICH concept.
+	 */
+	private void reportConceptsReferencedButNotDefined(ValidationRun run) {
+		List<Long> undefined = lastUndefinedConcepts.get();
+		if (undefined.isEmpty()) {
+			return;
+		}
+		Assertion assertion = new Assertion(
+				UUID.fromString(ASSERTION_ID_CONCEPTS_REFERENCED_BUT_NOT_DEFINED),
+				ValidationType.RELEASE_INTEGRITY,
+				"Concepts are referenced by the release but have no concept row, so they cannot be validated",
+				Assertion.FailureType.ERROR);
+		assertion.setCurrentViolatedConceptIds(new ArrayList<>(undefined));
+		run.addCompletedAssertion(assertion);
 	}
 
 	private void setMRCM(ValidationRun run, MRCMFactory mrcmFactory) {
@@ -193,7 +238,19 @@ public class ValidationService {
 		for (Assertion assertion : run.getFailedAssertions()) {
 			List<Long> conceptIds = assertion.getCurrentViolatedConceptIds();
 			for (Long conceptId : conceptIds) {
-				ConceptResult result = queryService.retrieveConcept(String.valueOf(conceptId));
+				ConceptResult result;
+				try {
+					result = queryService.retrieveConcept(String.valueOf(conceptId));
+				} catch (ConceptNotFoundException e) {
+					// A violated id that is not in the index. This step only
+					// DECORATES findings that already exist, so failing here threw
+					// away every finding in the run - including the one naming this
+					// very concept - to add a module id to one of them. The finding
+					// keeps its id and loses its module.
+					LOGGER.warn("Concept {} is reported as violating a rule but is not in the index, "
+							+ "so the finding cannot carry its module", conceptId);
+					continue;
+				}
 				if (!CollectionUtils.isEmpty(run.getModuleIds()) && !run.getModuleIds().contains(result.getModuleId())) {
 					continue;
 				}
@@ -956,6 +1013,14 @@ public class ValidationService {
 
 	private static class MRCMValidatorReleaseImportManager extends ReleaseImportManager {
 
+		/** Ids referenced by the release but never defined by a concept row. */
+		private final List<Long> undefinedConcepts = new ArrayList<>();
+
+		/** Those ids, after a load. */
+		List<Long> undefinedConcepts() {
+			return List.copyOf(undefinedConcepts);
+		}
+
 		private final ReleaseImporter releaseImporter;
 
 		public MRCMValidatorReleaseImportManager() {
@@ -981,7 +1046,41 @@ public class ValidationService {
 				}
 			}
 			final Map<Long, ? extends Concept> conceptMap = componentFactory.getComponentStore().getConcepts();
-			return writeToIndex(conceptMap, releaseStore, loadingProfile);
+			return writeToIndex(withoutUndefinedConcepts(conceptMap), releaseStore, loadingProfile);
+		}
+
+		/**
+		 * Drops concepts the release REFERENCES but never DEFINES, and records
+		 * their ids.
+		 *
+		 * <p>A component may name a concept for which the release carries no
+		 * concept row - an OWL axiom outliving the concept it is about, say. The
+		 * loader still materialises a Concept for it, with a null module and a
+		 * null definition status, and Lucene refuses a StringField whose value is
+		 * null. The whole MRCM phase then died inside the INDEXER with "value
+		 * must not be null" and no id, before a single assertion had run: the
+		 * release that most needs validating is the one that cannot be.
+		 *
+		 * <p>So they are left out of the index and reported as a finding
+		 * instead, and everything else in the release is still validated.
+		 */
+		private Map<Long, ? extends Concept> withoutUndefinedConcepts(Map<Long, ? extends Concept> concepts) {
+			Map<Long, Concept> defined = new HashMap<>(concepts.size());
+			for (Map.Entry<Long, ? extends Concept> entry : concepts.entrySet()) {
+				Concept concept = entry.getValue();
+				if (concept.getDefinitionStatusId() == null || concept.getModuleId() == null
+						|| concept.getEffectiveTime() == null) {
+					undefinedConcepts.add(entry.getKey());
+				} else {
+					defined.put(entry.getKey(), concept);
+				}
+			}
+			if (!undefinedConcepts.isEmpty()) {
+				LOGGER.error("{} concept(s) are referenced by the release but have no concept row, "
+						+ "so they cannot be indexed and are reported instead: {}",
+						undefinedConcepts.size(), undefinedConcepts);
+			}
+			return defined;
 		}
 	}
 }
