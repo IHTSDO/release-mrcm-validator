@@ -350,6 +350,31 @@ public class ValidationServiceTest {
 		assertTrue("the component store's concepts are released after indexing", componentStore.getConcepts().isEmpty());
 	}
 
+	@Test
+	public void anUndefinedConceptWithAnInvalidConcreteValueKeepsIdsAndConceptsParallel() throws Exception {
+		File files = copyOfTestRelease();
+		appendTo(files.toPath(), "RelationshipConcreteValues",
+				"30000000000000000\t20210131\t1\t900000000000207008\t" + UNDEFINED_CONCEPT
+						+ "\t#100.0\t1\t3311483000\t900000000000011006\t900000000000451002\n");
+		ValidationRun inferredRun = new ValidationRun(null, ContentType.INFERRED, false);
+		inferredRun.setFullSnapshotRelease(true);
+		inferredRun.setValidationTypes(Arrays.asList(ValidationType.values()));
+		ValidationService service = new ValidationService();
+		service.loadMRCM(files, inferredRun);
+
+		service.validateRelease(files, inferredRun);
+
+		List<Assertion> naming = inferredRun.getFailedAssertions().stream()
+				.filter(a -> a.getCurrentViolatedConceptIds().contains(UNDEFINED_CONCEPT))
+				.toList();
+		assertEquals("the release integrity finding and the concrete data type finding", 2, naming.size());
+		for (Assertion assertion : naming) {
+			assertEquals(assertion.getAssertionText(),
+					assertion.getCurrentViolatedConceptIds().stream().map(String::valueOf).toList(),
+					assertion.getCurrentViolatedConcepts().stream().map(ConceptResult::getId).toList());
+		}
+	}
+
 	/** An id no file in the test corpus defines. */
 	private static final long UNDEFINED_CONCEPT = 999999999000001007L;
 
@@ -358,6 +383,15 @@ public class ValidationServiceTest {
 	 * that has no concept row anywhere in it.
 	 */
 	private File releaseWithAnAxiomForAnUndefinedConcept() throws IOException {
+		File copy = copyOfTestRelease();
+		appendTo(copy.toPath(), "OWLExpression",
+				"c0ffee11-0000-4000-8000-00000000cafe\t20170731\t1\t900000000000207008"
+						+ "\t733073007\t" + UNDEFINED_CONCEPT
+						+ "\tSubClassOf(:" + UNDEFINED_CONCEPT + " :138875005)\n");
+		return copy;
+	}
+
+	private File copyOfTestRelease() throws IOException {
 		Path copy = Files.createTempDirectory("mrcm-undefined-concept");
 		copy.toFile().deleteOnExit();
 		Path source = testReleaseFiles.toPath();
@@ -368,18 +402,17 @@ public class ValidationServiceTest {
 				target.toFile().deleteOnExit();
 			}
 		}
-		Path axioms;
-		try (java.util.stream.Stream<Path> files = Files.list(copy)) {
-			axioms = files.filter(p -> p.getFileName().toString().contains("OWLExpression"))
+		return copy.toFile();
+	}
+
+	private static void appendTo(Path release, String fileNameFragment, String row) throws IOException {
+		Path file;
+		try (java.util.stream.Stream<Path> files = Files.list(release)) {
+			file = files.filter(p -> p.getFileName().toString().contains(fileNameFragment))
 					.findFirst()
 					.orElseThrow(() -> new IllegalStateException(
-							"the test corpus has no OWL expression file to extend"));
+							"the test corpus has no " + fileNameFragment + " file to extend"));
 		}
-		Files.writeString(axioms,
-				"c0ffee11-0000-4000-8000-00000000cafe\t20170731\t1\t900000000000207008"
-						+ "\t733073007\t" + UNDEFINED_CONCEPT
-						+ "\tSubClassOf(:" + UNDEFINED_CONCEPT + " :138875005)\n",
-				java.nio.file.StandardOpenOption.APPEND);
-		return copy.toFile();
+		Files.writeString(file, row, java.nio.file.StandardOpenOption.APPEND);
 	}
 }

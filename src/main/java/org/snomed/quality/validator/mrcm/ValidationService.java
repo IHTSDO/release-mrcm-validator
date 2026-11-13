@@ -248,6 +248,9 @@ public class ValidationService {
 		ConcreteAttributeDataTypeValidationService dataTypeValidationService = new ConcreteAttributeDataTypeValidationService();
 		dataTypeValidationService.validate(extractedRF2FilesDirectories, run);
 		for (Assertion assertion : run.getFailedAssertions()) {
+			if (ASSERTION_ID_CONCEPTS_REFERENCED_BUT_NOT_DEFINED.equals(assertion.getUuid().toString())) {
+				continue;
+			}
 			List<Long> conceptIds = assertion.getCurrentViolatedConceptIds();
 			for (Long conceptId : conceptIds) {
 				ConceptResult result;
@@ -259,8 +262,10 @@ public class ValidationService {
 					// away every finding in the run - including the one naming this
 					// very concept - to add a module id to one of them. The finding
 					// keeps its id and loses its module.
+					// Added ahead of the module filter: RVF reads one ConceptResult per violated id.
 					LOGGER.warn("Concept {} is reported as violating a rule but is not in the index, "
 							+ "so the finding cannot carry its module", conceptId);
+					assertion.getCurrentViolatedConcepts().add(new ConceptResult(String.valueOf(conceptId)));
 					continue;
 				}
 				if (!CollectionUtils.isEmpty(run.getModuleIds()) && !run.getModuleIds().contains(result.getModuleId())) {
